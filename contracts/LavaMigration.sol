@@ -1,43 +1,40 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.1;
 
 import 'hardhat/console.sol';
 import './interfaces/ILavaFinance.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 contract LavaMigration {
-	string private contractName;
-
-	// TODO: Get address from constructor
-	address private constant LAVA_FINANCE =
-		0xDe7E9fd01018C59DEB46bC36316da555Eb889a27;
-	address private constant LAVA_V2 = 0x7c105c37A622EB8586BEAef215d452b3f7Dc9A39;
+	address private LAVA_FINANCE;
+	address private LAVA_V2;
 	address private constant NULL_WALLET =
 		0x0000000000000000000000000000000000000000;
 
-	constructor(string memory _contractName) {
-		contractName = _contractName;
+	constructor(address lava_finance, address lava_v2) {
+		LAVA_FINANCE = lava_finance;
+		LAVA_V2 = lava_v2;
 	}
 
-	function getContractName() public view returns (string memory) {
-		return contractName;
+	function getAggregatedTrueRoi() public view returns (uint256) {
+		(, uint256 nodeDistributionTrueRoi, ) = getNodesDistribution(); // 18 decimal
+		uint256 trueRoi = getTrueRoi(); // 6 decimal
+		uint256 walletTokenTrueRoi = getLavaTokensInWallet(); // 18 decimal
+		uint256 unclaimedTokenTrueRoi = getUnclaimedTokens(); // 18 decimal
+
+		return
+			nodeDistributionTrueRoi +
+			(trueRoi * 1e12) + // Convert 6 decimal to 18 decimal
+			walletTokenTrueRoi +
+			unclaimedTokenTrueRoi;
 	}
 
-	// ✅ TrueROI Remaining ($) - trueRoiValue
-	function getTrueRoi() public view returns (uint256) {
-		// 6 decimal
-		uint256 investedAmount = ILavaFinance(LAVA_FINANCE).investedAmount(
-			msg.sender
-		);
-		uint256 claimedAmount = ILavaFinance(LAVA_FINANCE).claimedAmount(
-			msg.sender
-		);
+	function getAggregatedNftCount() public view returns (uint256) {
+		(uint256 claimableNftCountFromNodes, , ) = getNodesDistribution(); // 18 decimal
+		uint256 claimableNftCountFromBoosters = getBoostersNft(); // 18 decimal
 
-		if (claimedAmount >= investedAmount) return 0;
-		else return investedAmount - claimedAmount;
+		return claimableNftCountFromNodes + claimableNftCountFromBoosters;
 	}
-
-	// ❌ Level 1,2,3 Booster NFTs - nftCount
 
 	// ✅ Fuji, Krakatoa, Novarupta remaining nodes - nftCount, trueRoiValue
 	function getNodesDistribution()
@@ -70,13 +67,46 @@ contract LavaMigration {
 		}
 
 		uint256 remainingTrueRoi = (nodesTruRoi % (500 * 1e18));
-		uint256 claimableNftCount = (nodesTruRoi - remainingTrueRoi) / 500;
+		uint256 claimableNftCount = ((nodesTruRoi - remainingTrueRoi) / 500);
 
 		return (
 			claimableNftCount,
 			multiplicateByLavaValue(remainingTrueRoi),
 			nodeTireValues
 		);
+	}
+
+	// ✅ Level 1,2,3 Booster NFTs - nftCount
+	function getBoostersNft() public view returns (uint256) {
+		uint256 boosterNftsCount = 0;
+
+		address bronzeNFTAddress = ILavaFinance(LAVA_FINANCE).bronzeNFT();
+		uint256 bronzeNFTCount = IERC20(bronzeNFTAddress).balanceOf(msg.sender);
+		if (bronzeNFTCount > 0) boosterNftsCount += bronzeNFTCount * 2;
+
+		address silverNFTAddress = ILavaFinance(LAVA_FINANCE).silverNFT();
+		uint256 silverNFTCount = IERC20(silverNFTAddress).balanceOf(msg.sender);
+		if (silverNFTCount > 0) boosterNftsCount += (silverNFTCount * 6);
+
+		address goldNFTAddress = ILavaFinance(LAVA_FINANCE).goldNFT();
+		uint256 goldNFTCount = IERC20(goldNFTAddress).balanceOf(msg.sender);
+		if (goldNFTCount > 0) boosterNftsCount += goldNFTCount * 14;
+
+		return boosterNftsCount * 1e18;
+	}
+
+	// ✅ TrueROI Remaining ($) - trueRoiValue
+	function getTrueRoi() public view returns (uint256) {
+		// 6 decimal
+		uint256 investedAmount = ILavaFinance(LAVA_FINANCE).investedAmount(
+			msg.sender
+		);
+		uint256 claimedAmount = ILavaFinance(LAVA_FINANCE).claimedAmount(
+			msg.sender
+		);
+
+		if (claimedAmount >= investedAmount) return 0;
+		else return investedAmount - claimedAmount;
 	}
 
 	// ✅ $LAVA in Wallet - trueRoiValue

@@ -4,10 +4,9 @@ import type { LavaMigration } from '../types/ethers/contracts'
 import type { LavaMigration__factory } from '../types/ethers/factories/contracts'
 import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
 
-import { LAVA_BOOSTED_CONSUMERS, LAVA_CONSUMERS } from '../utils'
+import { LAVA_BOOSTED_CONSUMERS, LAVA_CONSUMERS, LavaContracts } from '../utils'
 
-const LAVA_MIGRATION_CONTRACT_NAME = 'Lava Migration'
-const LAVA_CONSUMER_ADDRESS = ethers.utils.getAddress(LAVA_CONSUMERS[5])
+const LAVA_CONSUMER_ADDRESS = ethers.utils.getAddress(LAVA_BOOSTED_CONSUMERS[1])
 
 describe('Lava Migration contract', function () {
 	let LavaMigration: LavaMigration__factory
@@ -21,7 +20,11 @@ describe('Lava Migration contract', function () {
 			'LavaMigration',
 			lavaMember,
 		)) as LavaMigration__factory
-		lavaMigration = await LavaMigration.deploy(LAVA_MIGRATION_CONTRACT_NAME)
+
+		lavaMigration = await LavaMigration.deploy(
+			LavaContracts.LavaFinance.address,
+			LavaContracts.LAVAv2.address,
+		)
 		await lavaMigration.deployed()
 	})
 
@@ -30,15 +33,8 @@ describe('Lava Migration contract', function () {
 		// await lavaMigration.deployed()
 	})
 
-	it(`getTrueRoi from Migraition contract`, async () => {
-		const remainingAmount = await lavaMigration.getTrueRoi()
-		const parsedRemainingAmount = ethers.utils.formatUnits(remainingAmount, 6)
-
-		expect(parsedRemainingAmount).to.equal('2579.364297')
-	})
-
 	it(`Get eligible NFTs and remaining ROI from nodes`, async () => {
-		const [_claimableNftCount, _remainingTrueRoi] =
+		const [_claimableNftCount, _remainingTrueRoi, _test] =
 			await lavaMigration.getNodesDistribution()
 
 		const claimableNftCount = ethers.utils
@@ -48,8 +44,15 @@ describe('Lava Migration contract', function () {
 			.formatUnits(_remainingTrueRoi, 18)
 			.toString()
 
-		expect(claimableNftCount).to.equal('4.0')
-		expect(remainingTrueRoi).to.equal('90.0')
+		expect(claimableNftCount).to.equal('21.0')
+		expect(remainingTrueRoi).to.equal('120.0')
+	})
+
+	it(`getTrueRoi from Migration contract`, async () => {
+		const remainingAmount = await lavaMigration.getTrueRoi()
+		const parsedRemainingAmount = ethers.utils.formatUnits(remainingAmount, 6)
+
+		expect(parsedRemainingAmount).to.equal('3193.174964')
 	})
 
 	it(`Get unclaimed tokens`, async () => {
@@ -59,12 +62,32 @@ describe('Lava Migration contract', function () {
 			_remainingUnclaimedTokensTrueRoi,
 			18,
 		)
-		expect(remainingUnclaimedTokensTrueRoi).to.equal('1.124250893523553236')
+		expect(remainingUnclaimedTokensTrueRoi).to.equal('0.0')
 	})
 
 	it(`Get $LAVA tokens in wallet`, async () => {
 		const _lavaTokensTrueRoi = await lavaMigration.getLavaTokensInWallet()
 		const lavaTokensTrueRoi = ethers.utils.formatUnits(_lavaTokensTrueRoi)
-		expect(lavaTokensTrueRoi).to.equal('8.210543355727239582')
+		expect(lavaTokensTrueRoi).to.equal('33.796708662054333327')
+	})
+
+	it(`Get booster NFTs`, async () => {
+		const _nftCountGivenByBoosters = await lavaMigration.getBoostersNft()
+		const nftCountGivenByBoosters = ethers.utils.formatUnits(
+			_nftCountGivenByBoosters,
+		)
+		expect(nftCountGivenByBoosters).to.equal('6.0')
+	})
+
+	it(`Get overall trueROI value`, async () => {
+		const _overallTrueROI = await lavaMigration.getAggregatedTrueRoi()
+		const overallTrueROI = ethers.utils.formatUnits(_overallTrueROI)
+		expect(overallTrueROI).to.equal('3346.971672662054333327')
+	})
+
+	it(`Get overall NFT count`, async () => {
+		const _overallTrueROI = await lavaMigration.getAggregatedNftCount()
+		const overallTrueROI = ethers.utils.formatUnits(_overallTrueROI)
+		expect(overallTrueROI).to.equal('27.0')
 	})
 })

@@ -23,6 +23,12 @@ interface ILavaFinance {
 
 	function claimedAmount(address addr) external view returns (uint256);
 
+	function bronzeNFT() external view returns (address);
+
+	function silverNFT() external view returns (address);
+
+	function goldNFT() external view returns (address);
+
 	function getClaimAmount(
 		address user,
 		uint256[] memory tokenIds,
