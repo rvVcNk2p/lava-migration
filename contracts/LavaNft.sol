@@ -13,6 +13,8 @@ contract LavaNft is ERC721URIStorage, AccessControl {
 	using Strings for uint256;
 	using Counters for Counters.Counter;
 
+	// TODO: Make it upgradable
+
 	bytes32 public constant MINTER_ROLE = keccak256('MINTER_ROLE');
 
 	Counters.Counter private _tokenIds;

@@ -4,6 +4,7 @@ export const LAVA_CONSUMERS = [
 	'0x19dead03929743c097016fb3d2c24924d842e6ed',
 	'0xdd6f896c227d2511f7648896afd6e721e931dd17',
 	'0xd3582814b0fb6eb5b17a01845ba1f9d8fca6e2eb',
+	'0xa499765b05ee50d3631c6770d29b400e4637deb5', // has lava in wallet + unclaimed tokens
 ]
 
 export const LAVA_BOOSTED_CONSUMERS = [
