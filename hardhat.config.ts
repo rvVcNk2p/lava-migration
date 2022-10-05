@@ -32,7 +32,7 @@ module.exports = {
 	networks: {
 		hardhat: {
 			forking: {
-				blockNumber: 19721684,
+				blockNumber: 20681087,
 				url: forkingUrl,
 			},
 			gasPrice: 225000000000,

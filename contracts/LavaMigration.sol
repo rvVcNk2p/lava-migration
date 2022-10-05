@@ -8,25 +8,44 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 contract LavaMigration {
 	address private LAVA_FINANCE;
 	address private LAVA_V2;
+	address private P_LAVA;
 	address private constant NULL_WALLET =
 		0x0000000000000000000000000000000000000000;
 
-	constructor(address lava_finance, address lava_v2) {
+	mapping(address => bool) migratedAddresses;
+	event SuccessfulMigration(
+		address indexed _from,
+		uint256 _nft,
+		uint256 _payout
+	);
+
+	constructor(
+		address lava_finance,
+		address lava_v2,
+		address pLava
+	) {
 		LAVA_FINANCE = lava_finance;
 		LAVA_V2 = lava_v2;
+		P_LAVA = pLava;
 	}
 
 	function getAggregatedTrueRoi() public view returns (uint256) {
 		(, uint256 nodeDistributionTrueRoi, ) = getNodesDistribution(); // 18 decimal
 		uint256 trueRoi = getTrueRoi(); // 6 decimal
-		uint256 walletTokenTrueRoi = getLavaTokensInWallet(); // 18 decimal
-		uint256 unclaimedTokenTrueRoi = getUnclaimedTokens(); // 18 decimal
+		uint256 walletTokenTrueRoi = getLavaTokensInWallettrueROI(); // 18 decimal
+		uint256 walletPLavaTokenTrueRoi = getPLavaTokensInWalletTrueROI(); // 18 decimal
+		uint256 unclaimedTokenTrueRoi = getUnclaimedTokensTrueROI(); // 18 decimal
 
 		return
 			nodeDistributionTrueRoi +
 			(trueRoi * 1e12) + // Convert 6 decimal to 18 decimal
 			walletTokenTrueRoi +
+			walletPLavaTokenTrueRoi +
 			unclaimedTokenTrueRoi;
+	}
+
+	function getMaxPayoutInUsdc() public view returns (uint256) {
+		return adjustUsdcPayoutPercentage(getAggregatedTrueRoi());
 	}
 
 	function getAggregatedNftCount() public view returns (uint256) {
@@ -110,13 +129,19 @@ contract LavaMigration {
 	}
 
 	// ✅ $LAVA in Wallet - trueRoiValue
-	function getLavaTokensInWallet() public view returns (uint256) {
+	function getLavaTokensInWallettrueROI() public view returns (uint256) {
 		uint256 lavaBalance = IERC20(LAVA_V2).balanceOf(msg.sender);
 		return multiplicateByLavaValue(lavaBalance);
 	}
 
+	// ✅ $pLAVA in Wallet - trueRoiValue
+	function getPLavaTokensInWalletTrueROI() public view returns (uint256) {
+		uint256 pLavaBalance = IERC20(P_LAVA).balanceOf(msg.sender);
+		return multiplicateByLavaValue(pLavaBalance);
+	}
+
 	// ✅ Unclaimed $LAVA - trueRoiValue
-	function getUnclaimedTokens() public view returns (uint256) {
+	function getUnclaimedTokensTrueROI() public view returns (uint256) {
 		uint256[] memory emptyArray = new uint256[](0);
 
 		(, uint256 compoundAmount, , , ) = ILavaFinance(LAVA_FINANCE)
@@ -125,11 +150,60 @@ contract LavaMigration {
 		return multiplicateByLavaValue(compoundAmount);
 	}
 
+	function migrate(uint256 requestedNftCount, uint256 requestedUsdcPayout)
+		public
+	{
+		require(!migratedAddresses[msg.sender], 'Migration already completed.');
+		require(
+			requestedNftCount >= getAggregatedNftCount(),
+			'Requested NFT count is lesser than the minimum.'
+		);
+		require(
+			getMaxPayoutInUsdc() >= requestedUsdcPayout,
+			'Requested USDC payout exceeded the claimable amount.'
+		);
+
+		if (requestedUsdcPayout == getMaxPayoutInUsdc()) {
+			// require
+			// TODO: 100% USDC option
+		} else if (requestedNftCount == getAggregatedNftCount()) {
+			// require
+			// TODO: 100 NFT option
+		} else {
+			// require
+			// TODO: Combination option
+			// 150
+		}
+
+		// TODO: Request to NFT contract with the 'requestedNftCount'
+		// TODO: Request to Distribution contract with the 'requestedUsdcPayout'
+
+		migratedAddresses[msg.sender] = true;
+
+		emit SuccessfulMigration(
+			msg.sender,
+			requestedNftCount,
+			requestedUsdcPayout
+		);
+	}
+
 	function multiplicateByLavaValue(uint256 _amount)
 		internal
 		pure
 		returns (uint256)
 	{
 		return (_amount * 3) / 10; // $0.30/LAVA
+	}
+
+	function adjustUsdcPayoutPercentage(uint256 _amount)
+		internal
+		pure
+		returns (uint256)
+	{
+		return (_amount / 100) * 21; // 21%
+	}
+
+	function isMigrated() public view returns (bool) {
+		return migratedAddresses[msg.sender];
 	}
 }
