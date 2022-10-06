@@ -3,8 +3,8 @@ pragma solidity ^0.8.1;
 
 import 'hardhat/console.sol';
 import './interfaces/ILavaFinance.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import './interfaces/ILavaNft.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 contract LavaMigration {
 	address private LAVA_FINANCE;
