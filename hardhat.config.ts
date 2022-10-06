@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 const SNOWTRACE_API_KEY = process.env.SNOWTRACE_API_KEY
+const PRIVATE_KEY = process.env.PRIVATE_KEY
 const FUJI_URL = 'https://api.avax-test.network/ext/bc/C/rpc'
 const AVALANCH_MAINNET_URL = 'https://api.avax.network/ext/bc/C/rpc'
 
@@ -27,6 +28,9 @@ module.exports = {
 			{
 				version: '0.8.1',
 			},
+			{
+				version: '0.8.2',
+			},
 		],
 	},
 	networks: {
@@ -41,11 +45,13 @@ module.exports = {
 			url: FUJI_URL,
 			gasPrice: 225000000000,
 			chainId: 43113,
+			accounts: [PRIVATE_KEY],
 		},
 		mainnet: {
 			url: AVALANCH_MAINNET_URL,
 			gasPrice: 225000000000,
 			chainId: 43114,
+			accounts: [PRIVATE_KEY],
 		},
 	},
 	etherscan: {

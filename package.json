@@ -7,7 +7,8 @@
 		"test": "npx hardhat test --network hardhat",
 		"deploy-migration": "npx hardhat run scripts/deployLavaMigration.ts --network hardhat",
 		"deploy-distribution": "npx hardhat run scripts/deployLavaDistribution.ts --network hardhat",
-		"deploy-nft": "npx hardhat run scripts/deployLavaNft.ts --network hardhat",
+		"deploy-nft:fork": "npx hardhat run scripts/deployLavaNft.ts --network hardhat",
+		"deploy-nft:fuji": "npx hardhat run scripts/deployLavaNft.ts --network fuji",
 		"nft": "npx hardhat run scripts/nft.ts --network hardhat",
 		"lint": "prettier ./test/**/*.ts --check",
 		"lint:fix": "prettier ./test/**/*.ts --write",
@@ -33,5 +34,8 @@
 		"hardhat": "^2.11.2",
 		"ts-node": "^10.2.1",
 		"typechain": "^8.1.0"
+	},
+	"dependencies": {
+		"@openzeppelin/contracts-upgradeable": "^4.8.0-rc.1"
 	}
 }

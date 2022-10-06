@@ -1,24 +1,29 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.1;
+pragma solidity ^0.8.2;
 
-import '@openzeppelin/contracts/utils/Counters.sol';
 import '@openzeppelin/contracts/utils/Strings.sol';
 import '@openzeppelin/contracts/utils/Base64.sol';
-import '@openzeppelin/contracts/access/AccessControl.sol';
-import '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol';
 
-// https://docs.openzeppelin.com/contracts/2.x/access-control
-
-contract LavaNft is ERC721URIStorage, AccessControl {
+contract LavaNft is
+	Initializable,
+	ERC721Upgradeable,
+	ERC721URIStorageUpgradeable,
+	AccessControlUpgradeable,
+	UUPSUpgradeable
+{
 	using Strings for uint256;
-	using Counters for Counters.Counter;
-
-	// TODO: Make it upgradable
+	using CountersUpgradeable for CountersUpgradeable.Counter;
 
 	bytes32 public constant MINTER_ROLE = keccak256('MINTER_ROLE');
+	bytes32 public constant UPGRADER_ROLE = keccak256('UPGRADER_ROLE');
+	CountersUpgradeable.Counter private _tokenIdCounter;
 
-	Counters.Counter private _tokenIds;
-	address payable owner;
 	address private migrationContract;
 
 	string private constant BASE_IPFS_URL =
@@ -26,16 +31,20 @@ contract LavaNft is ERC721URIStorage, AccessControl {
 	string private constant BASE_IMG_IPFS_CID =
 		'QmaYdi8vzDGqkU81j2dQpCyrSTiQnVybCkRGt4uT6hCG9y'; // TODO: Change this
 
-	constructor(
-		string memory _nftName,
-		string memory _nftSymbol,
-		address migrationContractAddress
-	) ERC721(_nftName, _nftSymbol) {
-		owner = payable(msg.sender);
-		_tokenIds.increment();
+	constructor() {
+		_disableInitializers();
+	}
 
-		_setupRole(MINTER_ROLE, msg.sender);
-		_setupRole(MINTER_ROLE, migrationContractAddress);
+	function initialize() public initializer {
+		__ERC721_init('Lava Venture Pass - Test', 'LVP');
+		__ERC721URIStorage_init();
+		__AccessControl_init();
+		__UUPSUpgradeable_init();
+
+		_grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+		_grantRole(MINTER_ROLE, msg.sender);
+		_grantRole(UPGRADER_ROLE, msg.sender);
+		// TODO: Add imgration contract address to minters
 	}
 
 	event MintEvent(address indexed _from, uint256 indexed _tokenId);
@@ -73,28 +82,40 @@ contract LavaNft is ERC721URIStorage, AccessControl {
 			);
 	}
 
-	function withdrawAll() public {
-		require(
-			msg.sender == owner,
-			'Only the contract owner can withdraw the funds!'
-		);
-		require(owner.send(address(this).balance));
+	function tokenURI(uint256 tokenId)
+		public
+		view
+		override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+		returns (string memory)
+	{
+		return super.tokenURI(tokenId);
 	}
 
-	function mint() public payable onlyRole(MINTER_ROLE) {
-		uint256 newItemId = _tokenIds.current();
-		_safeMint(msg.sender, newItemId);
-		_setTokenURI(newItemId, getTokenURI(newItemId, BASE_IMG_IPFS_CID));
+	function safeMint(string memory uri) public onlyRole(MINTER_ROLE) {
+		uint256 tokenId = _tokenIdCounter.current();
+		_tokenIdCounter.increment();
+		_safeMint(msg.sender, tokenId);
+		_setTokenURI(tokenId, getTokenURI(tokenId, BASE_IMG_IPFS_CID));
+		emit MintEvent(msg.sender, tokenId);
+	}
 
-		_tokenIds.increment();
+	function _authorizeUpgrade(address newImplementation)
+		internal
+		override
+		onlyRole(UPGRADER_ROLE)
+	{}
 
-		emit MintEvent(msg.sender, newItemId);
+	function _burn(uint256 tokenId)
+		internal
+		override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+	{
+		super._burn(tokenId);
 	}
 
 	function supportsInterface(bytes4 interfaceId)
 		public
 		view
-		override(ERC721, AccessControl)
+		override(ERC721Upgradeable, AccessControlUpgradeable)
 		returns (bool)
 	{
 		return super.supportsInterface(interfaceId);

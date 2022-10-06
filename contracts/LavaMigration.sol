@@ -12,7 +12,17 @@ contract LavaMigration {
 	address private constant NULL_WALLET =
 		0x0000000000000000000000000000000000000000;
 
-	mapping(address => bool) migratedAddresses;
+	struct Migration {
+		uint256 nftCount;
+		uint256 usdcPayout;
+		string migrationType;
+		bool isSuccess;
+	}
+
+	uint256 migrationIdx = 1;
+	Migration[] Migrations;
+	mapping(address => uint256) public migrationIdxMapping;
+
 	event SuccessfulMigration(
 		address indexed _from,
 		uint256 _nft,
@@ -153,7 +163,10 @@ contract LavaMigration {
 	function migrate(uint256 requestedNftCount, uint256 requestedUsdcPayout)
 		public
 	{
-		require(!migratedAddresses[msg.sender], 'Migration already completed.');
+		require(
+			migrationIdxMapping[msg.sender] == 0,
+			'Migration already completed.'
+		);
 		require(
 			requestedNftCount >= getAggregatedNftCount(),
 			'Requested NFT count is lesser than the minimum.'
@@ -169,16 +182,25 @@ contract LavaMigration {
 		} else if (requestedNftCount == getAggregatedNftCount()) {
 			// require
 			// TODO: 100 NFT option
-		} else {
+		} else if (requestedNftCount > getAggregatedNftCount()) {
 			// require
 			// TODO: Combination option
 			// 150
 		}
+		// TODO: The USDC payout will be send through this the Migration contract
 
-		// TODO: Request to NFT contract with the 'requestedNftCount'
-		// TODO: Request to Distribution contract with the 'requestedUsdcPayout'
+		// TODO: Mint 'requestedNftCount' from the NFT contract.
 
-		migratedAddresses[msg.sender] = true;
+		migrationIdxMapping[msg.sender] = migrationIdx;
+		Migrations.push(
+			Migration(
+				requestedNftCount,
+				requestedUsdcPayout,
+				'100_nft--100_usdc--combination', // TODO: Corresponding type selection
+				true
+			)
+		);
+		migrationIdx++;
 
 		emit SuccessfulMigration(
 			msg.sender,
@@ -204,6 +226,39 @@ contract LavaMigration {
 	}
 
 	function isMigrated() public view returns (bool) {
-		return migratedAddresses[msg.sender];
+		return Migrations[migrationIdxMapping[msg.sender] - 1].isSuccess;
+	}
+
+	function getMigrationStats()
+		public
+		view
+		returns (
+			uint256, // Total amount of users that have migrated
+			uint256[] memory, // The distribution between the 3 choices (100% NFT, 100% USDC, Combination)
+			uint256, // Total NFTs minted
+			uint256 // Total USDC minted
+		)
+	{
+		uint256[] memory distributionArray = new uint256[](3);
+		uint256 mintedNfts = 0;
+		uint256 mintedUsdc = 0;
+
+		for (uint256 i = 0; i < migrationIdx - 1; i++) {
+			uint256 nftCount = Migrations[migrationIdxMapping[msg.sender] - 1]
+				.nftCount;
+			uint256 usdcPayout = Migrations[migrationIdxMapping[msg.sender] - 1]
+				.usdcPayout;
+			string memory migrationType = Migrations[
+				migrationIdxMapping[msg.sender] - 1
+			].migrationType;
+
+			mintedNfts += nftCount;
+			mintedUsdc += usdcPayout;
+
+			// TODO: Increment the right index of distributionArray
+			console.log('migrationType: ', migrationType);
+		}
+
+		return (migrationIdx - 1, distributionArray, mintedNfts, mintedUsdc);
 	}
 }
