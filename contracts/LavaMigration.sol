@@ -4,6 +4,7 @@ pragma solidity ^0.8.1;
 import 'hardhat/console.sol';
 import './interfaces/ILavaFinance.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import './interfaces/ILavaNft.sol';
 
 contract LavaMigration {
 	address private LAVA_FINANCE;
@@ -11,6 +12,8 @@ contract LavaMigration {
 	address private P_LAVA;
 	address private constant NULL_WALLET =
 		0x0000000000000000000000000000000000000000;
+	address public NFT_CONTRAT_ADDRESS = NULL_WALLET;
+	address public OWNER;
 
 	struct Migration {
 		uint256 nftCount;
@@ -26,7 +29,8 @@ contract LavaMigration {
 	event SuccessfulMigration(
 		address indexed _from,
 		uint256 _nft,
-		uint256 _payout
+		uint256 _payout,
+		uint256[] _tokenIds
 	);
 
 	constructor(
@@ -37,6 +41,7 @@ contract LavaMigration {
 		LAVA_FINANCE = lava_finance;
 		LAVA_V2 = lava_v2;
 		P_LAVA = pLava;
+		OWNER = msg.sender;
 	}
 
 	function getAggregatedTrueRoi() public view returns (uint256) {
@@ -164,11 +169,15 @@ contract LavaMigration {
 		public
 	{
 		require(
+			NFT_CONTRAT_ADDRESS != NULL_WALLET,
+			"Nft contract address isn't set yet."
+		);
+		require(
 			migrationIdxMapping[msg.sender] == 0,
 			'Migration already completed.'
 		);
 		require(
-			requestedNftCount >= getAggregatedNftCount(),
+			requestedNftCount * 1e18 >= getAggregatedNftCount(),
 			'Requested NFT count is lesser than the minimum.'
 		);
 		require(
@@ -179,17 +188,20 @@ contract LavaMigration {
 		if (requestedUsdcPayout == getMaxPayoutInUsdc()) {
 			// require
 			// TODO: 100% USDC option
-		} else if (requestedNftCount == getAggregatedNftCount()) {
+		} else if (requestedNftCount * 1e18 == getAggregatedNftCount()) {
 			// require
 			// TODO: 100 NFT option
-		} else if (requestedNftCount > getAggregatedNftCount()) {
+		} else if (requestedNftCount * 1e18 > getAggregatedNftCount()) {
 			// require
 			// TODO: Combination option
 			// 150
 		}
-		// TODO: The USDC payout will be send through this the Migration contract
 
-		// TODO: Mint 'requestedNftCount' from the NFT contract.
+		uint256[] memory testDates = new uint256[](2);
+		uint256[] memory tokenIds = ILavaNft(NFT_CONTRAT_ADDRESS).mintBatch(
+			msg.sender,
+			testDates
+		);
 
 		migrationIdxMapping[msg.sender] = migrationIdx;
 		Migrations.push(
@@ -202,10 +214,13 @@ contract LavaMigration {
 		);
 		migrationIdx++;
 
+		// TODO: The USDC payout will be send through this the Migration contract
+
 		emit SuccessfulMigration(
 			msg.sender,
 			requestedNftCount,
-			requestedUsdcPayout
+			requestedUsdcPayout,
+			tokenIds
 		);
 	}
 
@@ -260,5 +275,15 @@ contract LavaMigration {
 		}
 
 		return (migrationIdx - 1, distributionArray, mintedNfts, mintedUsdc);
+	}
+
+	function setContractOwner(address newAddress) public {
+		require(msg.sender == OWNER, 'Permission denied.');
+		OWNER = newAddress;
+	}
+
+	function setNftContractAddress(address newAddress) public {
+		require(msg.sender == OWNER, 'Permission denied.');
+		NFT_CONTRAT_ADDRESS = newAddress;
 	}
 }
