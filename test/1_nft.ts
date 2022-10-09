@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
-import { deployProxy } from '../utils'
+import { DependencyContracts, deployProxy } from '../utils'
 
 import type { LavaNft, LavaMigration } from '../types/ethers/contracts'
 import type {
@@ -11,6 +11,7 @@ import type {
 import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
 
 import { LAVA_BOOSTED_CONSUMERS, LAVA_CONSUMERS, LavaContracts } from '../utils'
+import { Contract } from 'ethers'
 
 const LAVA_CONSUMER_ADDRESS = ethers.utils.getAddress(LAVA_BOOSTED_CONSUMERS[1])
 
@@ -35,6 +36,7 @@ const deployMigrationFixture = async () => {
 		LavaContracts.LavaFinance.address,
 		LavaContracts.LAVAv2.address,
 		LavaContracts.pLAVA.address,
+		DependencyContracts.erc20.USDCE,
 	)
 	await lavaMigration.deployed()
 
@@ -55,6 +57,7 @@ describe('Nft - getMigrationStats()', async () => {
 	let lavaNft: LavaNft
 	let lavaMigration: LavaMigration
 	let lavaMember: any
+	let USDCE: Contract
 
 	before(async () => {
 		const {
@@ -65,6 +68,17 @@ describe('Nft - getMigrationStats()', async () => {
 		lavaNft = _lavaNft
 		lavaMigration = _lavaMigration
 		lavaMember = _lavaMember
+
+		// Send initial fund to contract
+		const whaleAddress = '0x055ae96d7766ec1f51f130042f0b6bee3eb71099'
+		const usdceWhale = await ethers.getImpersonatedSigner(whaleAddress)
+
+		USDCE = new ethers.Contract(
+			DependencyContracts.erc20.USDCE,
+			DependencyContracts.erc20.ABI,
+			usdceWhale,
+		)
+		await USDCE.transfer(lavaMigration.address, 10000 * 1e6)
 	})
 
 	it(`NFT contract setup. Everything is has been initialized correctly.`, async () => {
@@ -93,7 +107,7 @@ describe('Nft - getMigrationStats()', async () => {
 	})
 
 	it(`Check the creation date of the first minted NFT.`, async () => {
-		const nftTokenUribase64 = await lavaNft.getTokenURI(1, 1638352800)
+		const nftTokenUribase64: any = await lavaNft.getTokenURI(1)
 
 		const parsedTokenUri = JSON.parse(
 			Buffer.from(nftTokenUribase64.split(',')[1], 'base64').toString('utf8'),
@@ -111,15 +125,19 @@ describe('Nft - getMigrationStats()', async () => {
 	})
 
 	it(`Mint nft with Migration contract.`, async () => {
-		await expect(lavaMigration.migrate(32, 100))
+		await expect(
+			lavaMigration.migrate(32, 100, '100_usdc', [
+				...Array.from({ length: 31 }, () => 1665272623),
+			]),
+		)
 			.to.emit(lavaMigration, 'SuccessfulMigration')
 			.withArgs(lavaMember.address, 32, 100, [2, 3])
 	})
 
 	it(`[2x] Mint nft with Migration contract.`, async () => {
 		const errorMessage = 'Migration already completed.'
-		await expect(lavaMigration.migrate(32, 100)).to.be.revertedWith(
-			errorMessage,
-		)
+		await expect(
+			lavaMigration.migrate(32, 100, '100_nft', []),
+		).to.be.revertedWith(errorMessage)
 	})
 })

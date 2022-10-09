@@ -34,3 +34,22 @@ export const upgradeProxy = async (
 	console.log('== Implementation address:', implAddress)
 	return contract
 }
+
+export const getHigherGas = async (addGweiToGas = 0) => {
+	const [deployer] = await ethers.getSigners()
+	const avgGasPrice = await deployer.getGasPrice()
+
+	if (!addGweiToGas) {
+		// increase gas by 8%
+		addGweiToGas = ethers.utils.formatUnits(avgGasPrice.mul(8).div(100), 'gwei')
+	}
+	return avgGasPrice.add(
+		ethers.utils.parseUnits(addGweiToGas.toString(), 'gwei'),
+	)
+}
+
+export const getOverrideWithHigherGas = async (addGweiToGas = 0) => {
+	return {
+		gasPrice: await getHigherGas(addGweiToGas),
+	}
+}

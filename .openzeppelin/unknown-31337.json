@@ -2,15 +2,25 @@
   "manifestVersion": "3.2",
   "proxies": [
     {
+      "address": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+      "txHash": "0x56b05f4c22b2a10e8898bd7d6f3c5330551d93ab430044742ecb954f802533cc",
+      "kind": "uups"
+    },
+    {
       "address": "0x202CCe504e04bEd6fC0521238dDf04Bc9E8E15aB",
-      "txHash": "0xe277e4840625bbfb82db440775abaf76dfaab4f09fb21d03522542037f8f1bc3",
+      "txHash": "0x4ce0cee5fdc5ebb011638365d858dd0dde599b320dfb987c0314c313f4af4f86",
+      "kind": "uups"
+    },
+    {
+      "address": "0x172076E0166D1F9Cc711C77Adf8488051744980C",
+      "txHash": "0x03c583d1adf6edc599596dada7618481f615ec3fd9151db630245d0cb5a19352",
       "kind": "uups"
     }
   ],
   "impls": {
-    "4f251988725eb56dd40c348133440c40ae8777d5734f8b5d370748014f861de1": {
+    "0cc13d5730afa346d5b1eeebd113aaa960335dc4148d09e9c0d2c12a0973704a": {
       "address": "0x0355B7B8cb128fA5692729Ab3AAa199C1753f726",
-      "txHash": "0x55fc57c82775770f278a198a7af9754a5148748ca22292471b517e18f2cdff7a",
+      "txHash": "0xf72b4cd6a3ea6b2791562fe088c8481c94e6cad29da80b45cfaf995a3c3915c4",
       "layout": {
         "solcVersion": "0.8.2",
         "storage": [
@@ -166,6 +176,14 @@
             "type": "t_address",
             "contract": "LavaNft",
             "src": "contracts/LavaNft.sol:29"
+          },
+          {
+            "label": "nodeClaimableDate",
+            "offset": 0,
+            "slot": "353",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "LavaNft",
+            "src": "contracts/LavaNft.sol:36"
           }
         ],
         "types": {
@@ -215,6 +233,10 @@
           },
           "t_mapping(t_uint256,t_string_storage)": {
             "label": "mapping(uint256 => string)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
             "numberOfBytes": "32"
           },
           "t_string_storage": {

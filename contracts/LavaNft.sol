@@ -28,10 +28,14 @@ contract LavaNft is
 
 	address public migrationContract;
 
+	uint256 private constant TRADED_TIME = 1666396800; // Saturday, 22 October 2022 00:00:00
+
 	string private constant BASE_IPFS_URL =
 		'https://currated-labs.infura-ipfs.io/ipfs/'; // TODO: Change ipfs base url
 	string private constant BASE_IMG_IPFS_CID =
 		'QmaYdi8vzDGqkU81j2dQpCyrSTiQnVybCkRGt4uT6hCG9y'; // TODO: Change ipfs base image
+
+	mapping(uint256 => uint256) nodeClaimableDate;
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	constructor() {
@@ -67,11 +71,9 @@ contract LavaNft is
 		return string(abi.encodePacked(BASE_IPFS_URL, BASE_IMG_IPFS_CID));
 	}
 
-	function getTokenURI(uint256 tokenId, uint256 creationDate)
-		public
-		pure
-		returns (string memory)
-	{
+	function getTokenURI(uint256 tokenId) public view returns (string memory) {
+		string memory creationDate = Strings.toString(nodeClaimableDate[tokenId]);
+
 		bytes memory dataURI = abi.encodePacked( // TODO: Change this
 			'{',
 			'"name": "Lava Venture Pass #',
@@ -79,7 +81,7 @@ contract LavaNft is
 			'",',
 			'"description": "NFT that gives claimable opportunity to LAVA investments.",',
 			'"node_created_at": "',
-			creationDate.toString(),
+			creationDate,
 			'",',
 			'"image": "',
 			generateDefaultNftImage(),
@@ -112,7 +114,9 @@ contract LavaNft is
 		uint256 tokenId = _tokenIdCounter.current();
 		_tokenIdCounter.increment();
 		_safeMint(minter, tokenId);
-		_setTokenURI(tokenId, getTokenURI(tokenId, creationDate));
+
+		nodeClaimableDate[tokenId] = creationDate;
+		_setTokenURI(tokenId, getTokenURI(tokenId));
 		emit MintEvent(minter, tokenId, creationDate);
 		return tokenId;
 	}
@@ -150,5 +154,33 @@ contract LavaNft is
 		returns (bool)
 	{
 		return super.supportsInterface(interfaceId);
+	}
+
+	function safeTransferFrom(
+		address from,
+		address to,
+		uint256 tokenId
+	) public override {
+		super.safeTransferFrom(from, to, tokenId);
+		nodeClaimableDate[tokenId] = TRADED_TIME;
+	}
+
+	function safeTransferFrom(
+		address from,
+		address to,
+		uint256 tokenId,
+		bytes memory _data
+	) public override {
+		super.safeTransferFrom(from, to, tokenId, _data);
+		nodeClaimableDate[tokenId] = TRADED_TIME;
+	}
+
+	function transferFrom(
+		address from,
+		address to,
+		uint256 tokenId
+	) public override {
+		super.transferFrom(from, to, tokenId);
+		nodeClaimableDate[tokenId] = TRADED_TIME;
 	}
 }

@@ -6,13 +6,38 @@ import './interfaces/ILavaFinance.sol';
 import './interfaces/ILavaNft.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
+function quickSort(
+	uint256[] memory arr,
+	int256 left,
+	int256 right
+) pure {
+	int256 i = left;
+	int256 j = right;
+	if (i == j) return;
+	uint256 pivot = arr[uint256(left + (right - left) / 2)];
+	while (i <= j) {
+		while (arr[uint256(i)] < pivot) i++;
+		while (pivot < arr[uint256(j)]) j--;
+		if (i <= j) {
+			(arr[uint256(i)], arr[uint256(j)]) = (arr[uint256(j)], arr[uint256(i)]);
+			i++;
+			j--;
+		}
+	}
+	if (left < j) quickSort(arr, left, j);
+	if (i < right) quickSort(arr, i, right);
+}
+
 contract LavaMigration {
 	address private LAVA_FINANCE;
 	address private LAVA_V2;
 	address private P_LAVA;
 	address private constant NULL_WALLET =
 		0x0000000000000000000000000000000000000000;
+	// 	Wed Jan 01 2020 00:00:00 GMT+0000 - Stored in seconds
+	uint256 private constant UNIX_TIMESTAMP = 1577836800;
 	address public NFT_CONTRAT_ADDRESS = NULL_WALLET;
+	address public USDCE_TOKEN_ADDRESS = NULL_WALLET;
 	address public OWNER;
 
 	struct Migration {
@@ -36,16 +61,18 @@ contract LavaMigration {
 	constructor(
 		address lava_finance,
 		address lava_v2,
-		address pLava
+		address pLava,
+		address usdce
 	) {
 		LAVA_FINANCE = lava_finance;
 		LAVA_V2 = lava_v2;
 		P_LAVA = pLava;
+		USDCE_TOKEN_ADDRESS = usdce;
 		OWNER = msg.sender;
 	}
 
 	function getAggregatedTrueRoi() public view returns (uint256) {
-		(, uint256 nodeDistributionTrueRoi, ) = getNodesDistribution(); // 18 decimal
+		(, uint256 nodeDistributionTrueRoi, , ) = getNodesDistribution(); // 18 decimal
 		uint256 trueRoi = getTrueRoi(); // 6 decimal
 		uint256 walletTokenTrueRoi = getLavaTokensInWallettrueROI(); // 18 decimal
 		uint256 walletPLavaTokenTrueRoi = getPLavaTokensInWalletTrueROI(); // 18 decimal
@@ -63,11 +90,27 @@ contract LavaMigration {
 		return adjustUsdcPayoutPercentage(getAggregatedTrueRoi());
 	}
 
-	function getAggregatedNftCount() public view returns (uint256) {
-		(uint256 claimableNftCountFromNodes, , ) = getNodesDistribution(); // 18 decimal
-		uint256 claimableNftCountFromBoosters = getBoostersNft(); // 18 decimal
+	function getAggregatedNftCount()
+		public
+		view
+		returns (uint256, uint256[] memory)
+	{
+		(, , , uint256[] memory nodeCreationDates) = getNodesDistribution(); // 18 decimal
+		uint256 claimableNftCountFromBoosters = getBoostersNft() / 1e18; // 18 decimal
 
-		return claimableNftCountFromNodes + claimableNftCountFromBoosters;
+		uint256[] memory boosterNodeCreationDates = new uint256[](
+			claimableNftCountFromBoosters
+		);
+
+		for (uint256 i = 0; i < claimableNftCountFromBoosters; i++) {
+			boosterNodeCreationDates[i] = UNIX_TIMESTAMP;
+		}
+
+		return (
+			claimableNftCountFromBoosters + nodeCreationDates.length,
+			//nodeCreationDates
+			concatArrays(boosterNodeCreationDates, nodeCreationDates)
+		);
 	}
 
 	// ✅ Fuji, Krakatoa, Novarupta remaining nodes - nftCount, trueRoiValue
@@ -77,6 +120,7 @@ contract LavaMigration {
 		returns (
 			uint256,
 			uint256,
+			uint256[] memory,
 			uint256[] memory
 		)
 	{
@@ -85,6 +129,7 @@ contract LavaMigration {
 		);
 
 		uint256[] memory nodeTireValues = new uint256[](nodesList.length);
+		uint256[] memory nodeCreationDates = new uint256[](nodesList.length);
 
 		uint256 nodesTruRoi = 0;
 
@@ -96,6 +141,12 @@ contract LavaMigration {
 				nodeData.tier
 			);
 
+			if (nodeData.creationTime == 0) {
+				nodeCreationDates[i] = UNIX_TIMESTAMP;
+			} else {
+				nodeCreationDates[i] = nodeData.creationTime;
+			}
+
 			nodesTruRoi += tier.cost; // 18 decimal
 			nodeTireValues[i] = tier.cost; // 18 decimal
 		}
@@ -106,7 +157,8 @@ contract LavaMigration {
 		return (
 			claimableNftCount,
 			multiplicateByLavaValue(remainingTrueRoi),
-			nodeTireValues
+			nodeTireValues,
+			sliceArray(sort(nodeCreationDates), claimableNftCount)
 		);
 	}
 
@@ -165,9 +217,16 @@ contract LavaMigration {
 		return multiplicateByLavaValue(compoundAmount);
 	}
 
-	function migrate(uint256 requestedNftCount, uint256 requestedUsdcPayout)
-		public
-	{
+	function migrate(
+		uint256 requestedNftCount,
+		uint256 requestedUsdcPayout,
+		string memory migrationType,
+		uint256[] memory nodeCreationDates
+	) public {
+		require(
+			USDCE_TOKEN_ADDRESS != NULL_WALLET,
+			"USDC.e contract address isn't set yet."
+		);
 		require(
 			NFT_CONTRAT_ADDRESS != NULL_WALLET,
 			"Nft contract address isn't set yet."
@@ -176,8 +235,9 @@ contract LavaMigration {
 			migrationIdxMapping[msg.sender] == 0,
 			'Migration already completed.'
 		);
+		(uint256 minNftCount, ) = getAggregatedNftCount();
 		require(
-			requestedNftCount * 1e18 >= getAggregatedNftCount(),
+			requestedNftCount >= minNftCount,
 			'Requested NFT count is lesser than the minimum.'
 		);
 		require(
@@ -185,43 +245,35 @@ contract LavaMigration {
 			'Requested USDC payout exceeded the claimable amount.'
 		);
 
-		if (requestedUsdcPayout == getMaxPayoutInUsdc()) {
-			// require
-			// TODO: 100% USDC option
-		} else if (requestedNftCount * 1e18 == getAggregatedNftCount()) {
-			// require
-			// TODO: 100 NFT option
-		} else if (requestedNftCount * 1e18 > getAggregatedNftCount()) {
-			// require
-			// TODO: Combination option
-			// 150
+		uint256 sentUsdcAmount = 0;
+		uint256 mintedNft = 0;
+
+		if (compareStringsbyBytes(migrationType, '100_usdc')) {
+			// console.log('== 100_usdc');
+			sentUsdcAmount = requestedUsdcPayout;
+			mintedNft = requestedNftCount;
+			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount);
+		} else if (compareStringsbyBytes(migrationType, '100_nft')) {
+			// console.log('== 100_nft');
+			mintedNft = requestedNftCount;
+			sentUsdcAmount = 0;
+		} else if (compareStringsbyBytes(migrationType, 'combination')) {
+			// console.log('== combination');
+			mintedNft = requestedNftCount;
+			sentUsdcAmount = requestedUsdcPayout;
+			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount); // TODO: requestedNftCount
 		}
 
-		uint256[] memory testDates = new uint256[](2);
 		uint256[] memory tokenIds = ILavaNft(NFT_CONTRAT_ADDRESS).mintBatch(
 			msg.sender,
-			testDates
+			nodeCreationDates
 		);
 
 		migrationIdxMapping[msg.sender] = migrationIdx;
-		Migrations.push(
-			Migration(
-				requestedNftCount,
-				requestedUsdcPayout,
-				'100_nft--100_usdc--combination', // TODO: Corresponding type selection
-				true
-			)
-		);
+		Migrations.push(Migration(mintedNft, sentUsdcAmount, migrationType, true));
 		migrationIdx++;
 
-		// TODO: The USDC payout will be send through this the Migration contract
-
-		emit SuccessfulMigration(
-			msg.sender,
-			requestedNftCount,
-			requestedUsdcPayout,
-			tokenIds
-		);
+		emit SuccessfulMigration(msg.sender, mintedNft, sentUsdcAmount, tokenIds);
 	}
 
 	function multiplicateByLavaValue(uint256 _amount)
@@ -241,7 +293,9 @@ contract LavaMigration {
 	}
 
 	function isMigrated() public view returns (bool) {
-		return Migrations[migrationIdxMapping[msg.sender] - 1].isSuccess;
+		if (migrationIdxMapping[msg.sender] > 0)
+			return Migrations[migrationIdxMapping[msg.sender] - 1].isSuccess;
+		else return false;
 	}
 
 	function getMigrationStats()
@@ -270,8 +324,13 @@ contract LavaMigration {
 			mintedNfts += nftCount;
 			mintedUsdc += usdcPayout;
 
-			// TODO: Increment the right index of distributionArray
-			console.log('migrationType: ', migrationType);
+			if (compareStringsbyBytes(migrationType, '100_usdc')) {
+				distributionArray[0] += 1;
+			} else if (compareStringsbyBytes(migrationType, '100_nft')) {
+				distributionArray[1] += 1;
+			} else if (compareStringsbyBytes(migrationType, 'combination')) {
+				distributionArray[2] += 1;
+			}
 		}
 
 		return (migrationIdx - 1, distributionArray, mintedNfts, mintedUsdc);
@@ -285,5 +344,52 @@ contract LavaMigration {
 	function setNftContractAddress(address newAddress) public {
 		require(msg.sender == OWNER, 'Permission denied.');
 		NFT_CONTRAT_ADDRESS = newAddress;
+	}
+
+	function sort(uint256[] memory data) private pure returns (uint256[] memory) {
+		quickSort(data, int256(0), int256(data.length - 1));
+		return data;
+	}
+
+	function compareStringsbyBytes(string memory s1, string memory s2)
+		private
+		pure
+		returns (bool)
+	{
+		return keccak256(abi.encodePacked(s1)) == keccak256(abi.encodePacked(s2));
+	}
+
+	function sliceArray(uint256[] memory _array, uint256 size)
+		private
+		pure
+		returns (uint256[] memory)
+	{
+		// The nodeCreationDates length need to match with maximum claimable nft count from nodes
+		uint256[] memory slicedArray = new uint256[](size / 1e18);
+		for (uint256 i = 0; i < size / 1e18; i++) {
+			slicedArray[i] = _array[i];
+		}
+		return slicedArray;
+	}
+
+	function concatArrays(uint256[] memory arr1, uint256[] memory arr2)
+		internal
+		pure
+		returns (uint256[] memory)
+	{
+		uint256[] memory concatenatedArrays = new uint256[](
+			arr1.length + arr2.length
+		);
+
+		uint256 i = 0;
+
+		for (; i < arr1.length; i++) {
+			concatenatedArrays[i] = arr1[i];
+		}
+		for (uint256 j = 0; j < arr2.length; j++) {
+			concatenatedArrays[i + j] = arr2[j];
+		}
+
+		return concatenatedArrays;
 	}
 }

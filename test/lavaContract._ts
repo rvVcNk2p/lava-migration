@@ -8,8 +8,10 @@ import {
 	LAVA_CONSUMERS,
 	LavaContracts,
 	DependencyContracts,
-	NULL_WALLET,
 } from '../utils'
+
+const NULL_WALLET = '0x0000000000000000000000000000000000000000'
+
 
 ///////////////////////////////////////////////////////////
 // SEE https://hardhat.org/tutorial/testing-contracts.html

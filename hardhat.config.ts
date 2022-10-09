@@ -40,7 +40,6 @@ module.exports = {
 				blockNumber: 20681087,
 				url: forkingUrl,
 			},
-			gasPrice: 225000000000,
 		},
 		fuji: {
 			url: FUJI_URL,
