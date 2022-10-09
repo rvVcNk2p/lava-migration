@@ -289,7 +289,7 @@ contract LavaMigration {
 		pure
 		returns (uint256)
 	{
-		return (_amount / 100) * 21; // 21%
+		return (_amount * 21) / 100; // 21%
 	}
 
 	function isMigrated() public view returns (bool) {
