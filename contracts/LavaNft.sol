@@ -36,6 +36,7 @@ contract LavaNft is
 		'QmaYdi8vzDGqkU81j2dQpCyrSTiQnVybCkRGt4uT6hCG9y'; // TODO: Change ipfs base image
 
 	mapping(uint256 => uint256) nodeClaimableDate;
+	mapping(uint256 => string) accessLevels;
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	constructor() {
@@ -73,6 +74,7 @@ contract LavaNft is
 
 	function getTokenURI(uint256 tokenId) public view returns (string memory) {
 		string memory creationDate = Strings.toString(nodeClaimableDate[tokenId]);
+		string memory accessLevel = accessLevels[tokenId];
 
 		bytes memory dataURI = abi.encodePacked( // TODO: Change this
 			'{',
@@ -82,6 +84,9 @@ contract LavaNft is
 			'"description": "NFT that gives claimable opportunity to LAVA investments.",',
 			'"node_created_at": "',
 			creationDate,
+			'",',
+			'"access_level": "',
+			accessLevel,
 			'",',
 			'"image": "',
 			generateDefaultNftImage(),
@@ -116,6 +121,7 @@ contract LavaNft is
 		_safeMint(minter, tokenId);
 
 		nodeClaimableDate[tokenId] = creationDate;
+		accessLevels[tokenId] = getAccessLevel(creationDate);
 		_setTokenURI(tokenId, getTokenURI(tokenId));
 		emit MintEvent(minter, tokenId, creationDate);
 		return tokenId;
@@ -163,6 +169,7 @@ contract LavaNft is
 	) public override {
 		super.safeTransferFrom(from, to, tokenId);
 		nodeClaimableDate[tokenId] = TRADED_TIME;
+		accessLevels[tokenId] = 'Access Level 0';
 	}
 
 	function safeTransferFrom(
@@ -173,6 +180,7 @@ contract LavaNft is
 	) public override {
 		super.safeTransferFrom(from, to, tokenId, _data);
 		nodeClaimableDate[tokenId] = TRADED_TIME;
+		accessLevels[tokenId] = 'Access Level 0';
 	}
 
 	function transferFrom(
@@ -182,5 +190,41 @@ contract LavaNft is
 	) public override {
 		super.transferFrom(from, to, tokenId);
 		nodeClaimableDate[tokenId] = TRADED_TIME;
+		accessLevels[tokenId] = 'Access Level 0';
+	}
+
+	function getAccessLevel(uint256 creationDate)
+		private
+		pure
+		returns (string memory)
+	{
+		// 5/23/22
+		// Date and time (GMT): Monday, 23 May 2022 00:00:00
+		if (creationDate <= 1653264000) {
+			return 'Access Level 6';
+			// 5/30/22
+			// Date and time (GMT): Monday, 30 May 2022 00:00:00
+		} else if (creationDate <= 1653868800) {
+			return 'Access Level 5';
+			// 6/29/22
+			// Date and time (GMT): Wednesday, 29 June 2022 00:00:00
+		} else if (creationDate <= 1656460800) {
+			return 'Access Level 4';
+			// 7/7/22
+			// Date and time (GMT): Thursday, 7 July 2022 00:00:00
+		} else if (creationDate <= 1657152000) {
+			return 'Access Level 3';
+			// 7/27/22
+			// Date and time (GMT): Wednesday, 27 July 2022 00:00:00
+		} else if (creationDate <= 1658880000) {
+			return 'Access Level 2';
+			// 8/18/22
+			// Date and time (GMT): Thursday, 18 August 2022 00:00:00
+		} else if (creationDate <= 1660780800) {
+			return 'Access Level 1';
+			// After 8/18/22
+		} else {
+			return 'Access Level 0';
+		}
 	}
 }
