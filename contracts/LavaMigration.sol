@@ -249,16 +249,22 @@ contract LavaMigration {
 		uint256 mintedNft = 0;
 
 		if (compareStringsbyBytes(migrationType, '100_usdc')) {
-			// console.log('== 100_usdc');
+			require(
+				requestedNftCount == minNftCount,
+				'Only the min. amount of NFT allowed.'
+			);
 			sentUsdcAmount = requestedUsdcPayout;
 			mintedNft = requestedNftCount;
 			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount);
 		} else if (compareStringsbyBytes(migrationType, '100_nft')) {
-			// console.log('== 100_nft');
+			require(
+				requestedUsdcPayout == 0,
+				'Only 0 USDC payout allowed with this option.'
+			);
 			mintedNft = requestedNftCount;
 			sentUsdcAmount = 0;
 		} else if (compareStringsbyBytes(migrationType, 'combination')) {
-			// console.log('== combination');
+			// TODO: Check the requested NFT count and USDC payout amount.
 			mintedNft = requestedNftCount;
 			sentUsdcAmount = requestedUsdcPayout;
 			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount); // TODO: requestedNftCount
