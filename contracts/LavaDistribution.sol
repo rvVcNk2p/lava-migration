@@ -21,9 +21,11 @@ contract LavaDistribution {
 				totalLvpNft);
 	}
 
+	function performDistribution() public view {}
+
 	function adjustWithPercentage(uint256 _amount, uint256 _value)
 		internal
-		view
+		pure
 		returns (uint256)
 	{
 		return (_amount * _value) / 100;

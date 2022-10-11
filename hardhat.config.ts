@@ -40,6 +40,10 @@ module.exports = {
 				blockNumber: 20681087,
 				url: forkingUrl,
 			},
+			accounts: [PRIVATE_KEY].map((privateKey) => ({
+				balance: '100000000000000000000000',
+				privateKey,
+			})),
 		},
 		fuji: {
 			url: FUJI_URL,

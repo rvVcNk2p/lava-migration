@@ -1,46 +1,380 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
-
-import type { LavaDistribution } from '../types/ethers/contracts'
-import type { LavaDistribution__factory } from '../types/ethers/factories/contracts'
+import { BigNumber, Contract } from 'ethers'
+import type { LavaMigration, LavaNft } from '../types/ethers/contracts'
+import type {
+	LavaMigration__factory,
+	LavaNft__factory,
+} from '../types/ethers/factories/contracts'
 import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
+import { DependencyContracts } from '../utils/DependecyContracts'
 
-import { LAVA_BOOSTED_CONSUMERS } from '../utils'
+import {
+	LAVA_BOOSTED_CONSUMERS,
+	LAVA_CONSUMERS,
+	LavaContracts,
+	LAVA_NFT_NAME,
+	LAVA_NFT_SYMBOL,
+	deployProxy,
+	ParseFloat4E,
+} from '../utils'
 
-const LAVA_CONSUMER_ADDRESS = ethers.utils.getAddress(LAVA_BOOSTED_CONSUMERS[1])
+const NFT_PRICE_IN_USDC = 31.5
+const UNIX_TIMESTAMP = 1577836800 // 	Wed Jan 01 2020 00:00:00 GMT+0000
 
-const deployDistributionFixture = async () => {
-	let LavaDistribution: LavaDistribution__factory
-	let lavaDistribution: LavaDistribution
-	let lavaMember: SignerWithAddress
+const deployMigrationFixture = async () => {
+	let LavaMigration: LavaMigration__factory
+	let lavaMigration: LavaMigration
+	let lavaNft: LavaNft
 
-	lavaMember = await ethers.getImpersonatedSigner(LAVA_CONSUMER_ADDRESS)
+	const [deployer] = await ethers.getSigners()
 
-	LavaDistribution = (await ethers.getContractFactory(
-		'LavaDistribution',
-		lavaMember,
-	)) as LavaDistribution__factory
+	const lavaMember_1: SignerWithAddress = await ethers.getImpersonatedSigner(
+		ethers.utils.getAddress(LAVA_CONSUMERS[2]),
+	)
+	const lavaMember_2: SignerWithAddress = await ethers.getImpersonatedSigner(
+		ethers.utils.getAddress(LAVA_BOOSTED_CONSUMERS[1]),
+	)
+	const lavaMember_3: SignerWithAddress = await ethers.getImpersonatedSigner(
+		ethers.utils.getAddress(LAVA_BOOSTED_CONSUMERS[2]),
+	)
 
-	lavaDistribution = await LavaDistribution.deploy()
-	await lavaDistribution.deployed()
+	LavaMigration = (await ethers.getContractFactory(
+		'LavaMigration',
+		deployer,
+	)) as LavaMigration__factory
 
-	return { lavaDistribution, lavaMember }
+	lavaMigration = await LavaMigration.deploy(
+		LavaContracts.LavaFinance.address,
+		LavaContracts.LAVAv2.address,
+		LavaContracts.pLAVA.address,
+		DependencyContracts.erc20.USDCE,
+	)
+	await lavaMigration.deployed()
+
+	const LavaNft: LavaNft__factory = (await ethers.getContractFactory(
+		'LavaNft',
+		deployer,
+	)) as LavaNft__factory
+
+	lavaNft = await deployProxy('LavaNft', [
+		LAVA_NFT_NAME,
+		LAVA_NFT_SYMBOL,
+		lavaMigration.address,
+	])
+
+	return {
+		lavaMigration,
+		lavaNft,
+		deployer,
+		lavaMember_1,
+		lavaMember_2,
+		lavaMember_3,
+	}
 }
 
-describe('Distribution contract', async () => {
-	let lavaDistribution: LavaDistribution
+describe('migrate() - Test out the entire logic.', async () => {
+	let lavaMigration: LavaMigration
+	let lavaNft: LavaNft
+	let USDCE: Contract
+
+	let deployer: SignerWithAddress
+	let lavaMember_1: SignerWithAddress
+	let lavaMember_2: SignerWithAddress
+	let lavaMember_3: SignerWithAddress
 
 	before(async () => {
-		const { lavaDistribution: _lavaDistribution, lavaMember: _lavaMember } =
-			await loadFixture(deployDistributionFixture)
+		const {
+			lavaMigration: _lavaMigration,
+			lavaNft: _lavaNft,
+			deployer: _deployer,
+			lavaMember_1: _lavaMember_1,
+			lavaMember_2: _lavaMember_2,
+			lavaMember_3: _lavaMember_3,
+		} = await loadFixture(deployMigrationFixture)
 
-		lavaDistribution = _lavaDistribution
+		lavaMigration = _lavaMigration
+		lavaNft = _lavaNft
+
+		deployer = _deployer
+		lavaMember_1 = _lavaMember_1
+		lavaMember_2 = _lavaMember_2
+		lavaMember_3 = _lavaMember_3
+
+		await lavaMigration.setNftContractAddress(lavaNft.address)
+
+		// Send initial fund to contract
+		const whaleAddress = '0x055ae96d7766ec1f51f130042f0b6bee3eb71099'
+		const usdceWhale = await ethers.getImpersonatedSigner(whaleAddress)
+
+		USDCE = new ethers.Contract(
+			DependencyContracts.erc20.USDCE,
+			DependencyContracts.erc20.ABI,
+			usdceWhale,
+		)
+
+		await USDCE.transfer(lavaMigration.address, 100000 * 1e6)
 	})
 
-	it('[OK] Get non booster share price [4.81463649494463168]', async () => {
-		const nonBoostedNftShare = await lavaDistribution.getNonBoosterSharePrice()
-		const priceInNumber = ethers.utils.formatUnits(nonBoostedNftShare)
-		expect(priceInNumber).to.equal('4.81463649494463168')
+	it(`[OK] Fund Migration contract with: 100.000 USDC.e`, async () => {
+		const USDCE = new ethers.Contract(
+			DependencyContracts.erc20.USDCE,
+			DependencyContracts.erc20.ABI,
+			deployer,
+		)
+		const USDEalance = await USDCE.balanceOf(lavaMigration.address)
+		expect(USDEalance).to.be.eq(100000 * 1e6)
+	})
+
+	it(`[OK] [lavaMember_1] Migration type: '100_usdc'`, async () => {
+		const [overallNftCount, nodeCreationDates] = await lavaMigration
+			.connect(lavaMember_1)
+			.getAggregatedNftCount()
+
+		const _maxUsdcPayout: BigNumber = await lavaMigration
+			.connect(lavaMember_1)
+			.getMaxPayoutInUsdc()
+
+		const maxNftCount = parseInt(overallNftCount + '')
+		const maxUsdcPayout = ParseFloat4E(
+			ethers.utils.formatEther(_maxUsdcPayout),
+			2,
+		)
+		// ============================================
+		const starterUsdceOnMember = await USDCE.balanceOf(lavaMember_1.address)
+		const starterUsdceOnContract = await USDCE.balanceOf(lavaMigration.address)
+
+		const createdNftIds = Array.from({ length: maxNftCount }, (v, k) => k + 1)
+
+		await expect(
+			lavaMigration
+				.connect(lavaMember_1)
+				.migrate(maxNftCount, maxUsdcPayout, '100_usdc', nodeCreationDates),
+		)
+			.to.emit(lavaMigration, 'SuccessfulMigration')
+			.withArgs(lavaMember_1.address, maxNftCount, maxUsdcPayout, createdNftIds)
+
+		// ==============================================
+		// [START] Check the balance of the LAVA_CONSUMER_ADDRESS
+		// ==============================================
+		const endUsdceOnMember = await USDCE.balanceOf(lavaMember_1.address)
+		const givenUsdceAmount = endUsdceOnMember - starterUsdceOnMember
+		expect(givenUsdceAmount).to.be.eq(maxUsdcPayout)
+		// ==============================================
+		// [END] Check the balance of the LAVA_CONSUMER_ADDRESS
+		// ==============================================
+
+		// ==============================================
+		// [START] Check the USDC.e balance of the LAVA_MIGRATION
+		// ==============================================
+		const remainingUsdceOnContract = await USDCE.balanceOf(
+			lavaMigration.address,
+		)
+		expect(remainingUsdceOnContract).to.be.equals(
+			starterUsdceOnContract - maxUsdcPayout,
+		)
+		// ==============================================
+		// [END] Check the USDC.e balance of the LAVA_MIGRATION
+		// ==============================================
+
+		// ==================================
+		// [START] Check the Metadata of NFTs
+		// ==================================
+		const metadataResult: any = []
+
+		const nftsMetadata = await Promise.all(
+			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+		)
+		nftsMetadata.forEach((nft: any, idx) => {
+			const parsedTokenUri = JSON.parse(
+				Buffer.from(nft.split(',')[1], 'base64').toString('utf8'),
+			)
+			metadataResult.push(
+				parsedTokenUri.node_created_at == nodeCreationDates[idx],
+			)
+		})
+		expect(metadataResult.every((currVal: any) => currVal)).to.equal(true)
+		// ==================================
+		// [END] Check the Metadata of NFTs
+		// ==================================
+
+		const isSuccess = await lavaMigration.connect(lavaMember_1).isMigrated()
+		expect(isSuccess).to.equal(true)
+
+		// ==================================
+		// [START] Check the migration stats
+		// ==================================
+		const [migratedUsersCount, distributionArray, mintedNfts, mintedUsdc] =
+			await lavaMigration.connect(lavaMember_1).getMigrationStats()
+		expect(migratedUsersCount).to.eq(1)
+		expect(distributionArray[0]).to.eq(1)
+		expect(mintedNfts).to.eq(maxNftCount)
+		expect(mintedUsdc).to.eq(maxUsdcPayout)
+		// ==================================
+		// [START] Check the migration stats
+		// ==================================
+	})
+
+	it(`[OK] [lavaMember_2] Migration type: 'combination' - 3 extra NFT requested + remaining amount in USDC.e`, async () => {
+		const [overallNftCount, nodeCreationDates] = await lavaMigration
+			.connect(lavaMember_2)
+			.getAggregatedNftCount()
+
+		const _maxUsdcPayout: BigNumber = await lavaMigration
+			.connect(lavaMember_2)
+			.getMaxPayoutInUsdc()
+
+		const extraNftFromTrueROI = 3
+		const maxNftCount = parseInt(overallNftCount + '') + extraNftFromTrueROI
+
+		const mappedNodeCreationDates = [
+			...Array.from({ length: extraNftFromTrueROI }, () => UNIX_TIMESTAMP), // Add extra NFTS
+			...nodeCreationDates,
+		]
+
+		const remainingUsdcAmount = ParseFloat4E(
+			parseInt(ethers.utils.formatEther(_maxUsdcPayout)) -
+				extraNftFromTrueROI * NFT_PRICE_IN_USDC,
+			2,
+		)
+		// ============================================
+		// Check balance before migration
+		const balanceOfUsdceBefore = await USDCE.balanceOf(lavaMember_2.address)
+		// ============================================
+		const createdNftIds = Array.from({ length: maxNftCount }, (v, k) => k + 11) // 11
+		// Lava Memer 1 already minted the Nfts with tokenIds [1..10]
+
+		await expect(
+			lavaMigration
+				.connect(lavaMember_2)
+				.migrate(
+					maxNftCount,
+					remainingUsdcAmount,
+					'combination',
+					mappedNodeCreationDates,
+				),
+		)
+			.to.emit(lavaMigration, 'SuccessfulMigration')
+			.withArgs(
+				lavaMember_2.address,
+				maxNftCount,
+				remainingUsdcAmount,
+				createdNftIds,
+			)
+
+		// ==============================================
+		// [START] Check the balance of the LAVA_CONSUMER_ADDRESS
+		// ==============================================
+		const USDEalanceAfter = await USDCE.balanceOf(lavaMember_2.address)
+		const givenUsdceAmount = USDEalanceAfter - balanceOfUsdceBefore
+
+		expect(givenUsdceAmount).to.be.eq(remainingUsdcAmount)
+		// ==============================================
+		// [END] Check the balance of the LAVA_CONSUMER_ADDRESS
+		// ==============================================
+
+		// ==================================
+		// [Start] Check the Metadata of NFTs
+		// ==================================
+		const metadataResult: any = []
+
+		const nftsMetadata = await Promise.all(
+			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+		)
+		nftsMetadata.forEach((nft: any, idx) => {
+			const parsedTokenUri = JSON.parse(
+				Buffer.from(nft.split(',')[1], 'base64').toString('utf8'),
+			)
+
+			metadataResult.push(
+				parsedTokenUri.node_created_at == mappedNodeCreationDates[idx],
+			)
+		})
+
+		expect(metadataResult.every((currVal: any) => currVal)).to.equal(true)
+		// ==================================
+		// [Start] Check the Metadata of NFTs
+		// ==================================
+
+		const isSuccess = await lavaMigration.connect(lavaMember_2).isMigrated()
+		expect(isSuccess).to.equal(true)
+	})
+
+	it(`[OK] Migration type: '100_nft'`, async () => {
+		const [overallNftCount, nodeCreationDates] = await lavaMigration
+			.connect(lavaMember_3)
+			.getAggregatedNftCount()
+
+		const _maxUsdcPayout: BigNumber = await lavaMigration
+			.connect(lavaMember_3)
+			.getMaxPayoutInUsdc()
+
+		const extraNftFromTrueROI = Math.ceil(
+			parseInt(ethers.utils.formatEther(_maxUsdcPayout)) / NFT_PRICE_IN_USDC,
+		)
+
+		const maxNftCount = parseInt(overallNftCount + '') + extraNftFromTrueROI
+
+		const mappedNodeCreationDates = [
+			...Array.from({ length: extraNftFromTrueROI }, () => UNIX_TIMESTAMP), // Add extra NFTS
+			...nodeCreationDates,
+		]
+
+		// ============================================
+		const createdNftIds = Array.from({ length: maxNftCount }, (v, k) => k + 46) // 46
+		// Lava Memer 1 already minted the Nfts with tokenIds [1..10]
+		// Lava Memer 2 already minted the Nfts with tokenIds [11..45]
+
+		await expect(
+			lavaMigration
+				.connect(lavaMember_3)
+				.migrate(maxNftCount, 0, '100_nft', mappedNodeCreationDates),
+		)
+			.to.emit(lavaMigration, 'SuccessfulMigration')
+			.withArgs(lavaMember_3.address, maxNftCount, 0, createdNftIds)
+
+		// ==================================
+		// [Start] Check the Metadata of NFTs
+		// ==================================
+		const metadataResult: any = []
+
+		const nftsMetadata = await Promise.all(
+			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+		)
+		nftsMetadata.forEach((nft: any, idx) => {
+			const parsedTokenUri = JSON.parse(
+				Buffer.from(nft.split(',')[1], 'base64').toString('utf8'),
+			)
+
+			metadataResult.push(
+				parsedTokenUri.node_created_at == mappedNodeCreationDates[idx],
+			)
+		})
+		expect(metadataResult.every((currVal: any) => currVal)).to.equal(true)
+		// ==================================
+		// [Start] Check the Metadata of NFTs
+		// ==================================
+
+		const isSuccess = await lavaMigration.connect(lavaMember_3).isMigrated()
+		expect(isSuccess).to.equal(true)
+	})
+
+	it(`Check statistics`, async () => {
+		// ==================================
+		// [START] Check the migration stats
+		// ==================================
+		const [migratedUsersCount, distributionArray, mintedNfts, mintedUsdc] =
+			await lavaMigration.connect(lavaMember_1).getMigrationStats()
+
+		expect(migratedUsersCount).to.eq(3)
+		expect(distributionArray[0]).to.eq(1)
+		expect(distributionArray[1]).to.eq(1)
+		expect(distributionArray[2]).to.eq(1)
+		expect(mintedNfts).to.eq(303)
+		expect(mintedUsdc).to.eq(155830000)
+		// ==================================
+		// [START] Check the migration stats
+		// ==================================
 	})
 })

@@ -122,7 +122,7 @@ contract LavaNft is
 
 		nodeClaimableDate[tokenId] = creationDate;
 		accessLevels[tokenId] = getAccessLevel(creationDate);
-		_setTokenURI(tokenId, getTokenURI(tokenId));
+		_setTokenURI(tokenId, ''); // TODO: getTokenURI(tokenId)
 		emit MintEvent(minter, tokenId, creationDate);
 		return tokenId;
 	}

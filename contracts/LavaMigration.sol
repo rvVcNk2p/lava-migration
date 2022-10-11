@@ -108,7 +108,6 @@ contract LavaMigration {
 
 		return (
 			claimableNftCountFromBoosters + nodeCreationDates.length,
-			//nodeCreationDates
 			concatArrays(boosterNodeCreationDates, nodeCreationDates)
 		);
 	}
@@ -276,6 +275,7 @@ contract LavaMigration {
 		);
 
 		migrationIdxMapping[msg.sender] = migrationIdx;
+
 		Migrations.push(Migration(mintedNft, sentUsdcAmount, migrationType, true));
 		migrationIdx++;
 
@@ -319,13 +319,9 @@ contract LavaMigration {
 		uint256 mintedUsdc = 0;
 
 		for (uint256 i = 0; i < migrationIdx - 1; i++) {
-			uint256 nftCount = Migrations[migrationIdxMapping[msg.sender] - 1]
-				.nftCount;
-			uint256 usdcPayout = Migrations[migrationIdxMapping[msg.sender] - 1]
-				.usdcPayout;
-			string memory migrationType = Migrations[
-				migrationIdxMapping[msg.sender] - 1
-			].migrationType;
+			uint256 nftCount = Migrations[i].nftCount;
+			uint256 usdcPayout = Migrations[i].usdcPayout;
+			string memory migrationType = Migrations[i].migrationType;
 
 			mintedNfts += nftCount;
 			mintedUsdc += usdcPayout;
