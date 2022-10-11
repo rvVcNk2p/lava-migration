@@ -226,6 +226,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 			.getMaxPayoutInUsdc()
 
 		const extraNftFromTrueROI = 3
+
 		const maxNftCount = parseInt(overallNftCount + '') + extraNftFromTrueROI
 
 		const mappedNodeCreationDates = [
@@ -234,7 +235,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		]
 
 		const remainingUsdcAmount = ParseFloat4E(
-			parseInt(ethers.utils.formatEther(_maxUsdcPayout)) -
+			ethers.utils.formatEther(_maxUsdcPayout) -
 				extraNftFromTrueROI * NFT_PRICE_IN_USDC,
 			2,
 		)
@@ -372,7 +373,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		expect(distributionArray[1]).to.eq(1)
 		expect(distributionArray[2]).to.eq(1)
 		expect(mintedNfts).to.eq(303)
-		expect(mintedUsdc).to.eq(155830000)
+		expect(mintedUsdc).to.eq(321110000) // 321.11
 		// ==================================
 		// [START] Check the migration stats
 		// ==================================

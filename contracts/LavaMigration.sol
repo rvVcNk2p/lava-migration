@@ -39,6 +39,7 @@ contract LavaMigration {
 	address public NFT_CONTRAT_ADDRESS = NULL_WALLET;
 	address public USDCE_TOKEN_ADDRESS = NULL_WALLET;
 	address public OWNER;
+	uint256 private constant nftPriceInUsdc = 31500000; // 6 decimal
 
 	struct Migration {
 		uint256 nftCount;
@@ -263,7 +264,13 @@ contract LavaMigration {
 			mintedNft = requestedNftCount;
 			sentUsdcAmount = 0;
 		} else if (compareStringsbyBytes(migrationType, 'combination')) {
-			// TODO: Check the requested NFT count and USDC payout amount.
+			uint256 extraNftsPrice = ((requestedNftCount - minNftCount) *
+				nftPriceInUsdc); // 6 decimal
+			require(
+				(extraNftsPrice + requestedUsdcPayout) <= getMaxPayoutInUsdc() / 1e12,
+				'Requested usdc amout exceeded the limit.'
+			);
+
 			mintedNft = requestedNftCount;
 			sentUsdcAmount = requestedUsdcPayout;
 			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount); // TODO: requestedNftCount
