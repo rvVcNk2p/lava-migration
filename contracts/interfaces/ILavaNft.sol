@@ -6,7 +6,7 @@ interface ILavaNft {
 		external
 		returns (uint256[] memory);
 
-	function getMintedNftsCount() external view returns (uint256);
+	function totalSupply() external view returns (uint256);
 
 	function balanceOf(address consumer) external view returns (uint256);
 

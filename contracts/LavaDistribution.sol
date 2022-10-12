@@ -29,7 +29,7 @@ contract LavaDistribution {
 	}
 
 	function setNonBoosterSharePrice() public {
-		uint256 totalLvpNft = ILavaNft(nftContract).getMintedNftsCount();
+		uint256 totalLvpNft = ILavaNft(nftContract).totalSupply();
 		uint256[] memory numberOfBoostedLvps = ILavaMigration(migrationContract)
 			.getNumberOfBoostedLvps();
 		uint256 usdceAmount = IERC20(usdceAddress).balanceOf(address(this));
@@ -101,6 +101,7 @@ contract LavaDistribution {
 		return distributionValue;
 	}
 
+	// TODO
 	function performDistribution() public {
 		require(nonBoosterSharePrice > 0, 'Share price did not set yet.');
 

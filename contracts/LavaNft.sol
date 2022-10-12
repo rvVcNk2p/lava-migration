@@ -4,10 +4,9 @@ pragma solidity ^0.8.2;
 import '@openzeppelin/contracts/utils/Strings.sol';
 import '@openzeppelin/contracts/utils/Base64.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol';
 
 import 'hardhat/console.sol';
@@ -15,28 +14,23 @@ import 'hardhat/console.sol';
 contract LavaNft is
 	Initializable,
 	ERC721Upgradeable,
-	ERC721URIStorageUpgradeable,
-	AccessControlUpgradeable,
-	UUPSUpgradeable
+	ERC721EnumerableUpgradeable,
+	AccessControlUpgradeable
 {
 	using Strings for uint256;
 	using CountersUpgradeable for CountersUpgradeable.Counter;
 
 	bytes32 public constant MINTER_ROLE = keccak256('MINTER_ROLE');
-	bytes32 public constant UPGRADER_ROLE = keccak256('UPGRADER_ROLE');
 	CountersUpgradeable.Counter private _tokenIdCounter;
 
-	address private migrationContract;
-
-	uint256 private constant TRADED_TIME = 1666396800; // Saturday, 22 October 2022 00:00:00
+	uint256 public constant TRADED_TIME = 1666396800; // Saturday, 22 October 2022 00:00:00
 
 	string private constant BASE_IPFS_URL =
 		'https://currated-labs.infura-ipfs.io/ipfs/'; // TODO: Change ipfs base url
 	string private constant BASE_IMG_IPFS_CID =
 		'QmaYdi8vzDGqkU81j2dQpCyrSTiQnVybCkRGt4uT6hCG9y'; // TODO: Change ipfs base image
 
-	mapping(uint256 => uint256) nodeClaimableDate;
-	mapping(uint256 => string) accessLevels;
+	mapping(uint256 => uint256) tokenCreationDate;
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	constructor() {
@@ -49,36 +43,30 @@ contract LavaNft is
 		address _migrationContract
 	) public initializer {
 		__ERC721_init(_name, _symbol);
-		__ERC721URIStorage_init();
+		__ERC721Enumerable_init();
 		__AccessControl_init();
-		__UUPSUpgradeable_init();
 
 		_tokenIdCounter.increment();
-		migrationContract = _migrationContract;
-		_grantRole(MINTER_ROLE, migrationContract);
+		_grantRole(MINTER_ROLE, _migrationContract);
 
 		_grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 		_grantRole(MINTER_ROLE, msg.sender);
-		_grantRole(UPGRADER_ROLE, msg.sender);
-	}
-
-	event MintEvent(
-		address indexed _from,
-		uint256 indexed _tokenId,
-		uint256 creationDate
-	);
-
-	function getMintedNftsCount() public view returns (uint256) {
-		return _tokenIdCounter.current() - 1;
 	}
 
 	function generateDefaultNftImage() public pure returns (string memory) {
 		return string(abi.encodePacked(BASE_IPFS_URL, BASE_IMG_IPFS_CID));
 	}
 
-	function getTokenURI(uint256 tokenId) public view returns (string memory) {
-		string memory creationDate = Strings.toString(nodeClaimableDate[tokenId]);
-		string memory accessLevel = accessLevels[tokenId];
+	function tokenURI(uint256 tokenId)
+		public
+		view
+		override(ERC721Upgradeable)
+		returns (string memory)
+	{
+		string memory creationDate = Strings.toString(tokenCreationDate[tokenId]);
+		string memory accessLevel = Strings.toString(
+			getAccessLevel(tokenCreationDate[tokenId])
+		);
 
 		bytes memory dataURI = abi.encodePacked( // TODO: Change this
 			'{',
@@ -106,130 +94,111 @@ contract LavaNft is
 			);
 	}
 
-	function tokenURI(uint256 tokenId)
+	function tokenIdsOfOwner(address owner)
 		public
 		view
-		override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-		returns (string memory)
+		returns (uint256[] memory tokenIds)
 	{
-		return super.tokenURI(tokenId);
+		uint256 nftsAmount = this.balanceOf(owner);
+
+		for (uint256 i = 0; i < nftsAmount; i++) {
+			tokenIds[i] = this.tokenOfOwnerByIndex(owner, i);
+		}
 	}
 
 	function mintNft(address minter, uint256 creationDate)
 		public
 		onlyRole(MINTER_ROLE)
-		returns (uint256)
+		returns (uint256 tokenId)
 	{
-		uint256 tokenId = _tokenIdCounter.current();
+		tokenId = _tokenIdCounter.current();
 		_tokenIdCounter.increment();
 		_safeMint(minter, tokenId);
 
-		nodeClaimableDate[tokenId] = creationDate;
-		accessLevels[tokenId] = getAccessLevel(creationDate);
-		_setTokenURI(tokenId, ''); // TODO: getTokenURI(tokenId)
-		emit MintEvent(minter, tokenId, creationDate);
-		return tokenId;
+		tokenCreationDate[tokenId] = creationDate;
 	}
 
 	function mintBatch(address minter, uint256[] memory creationDates)
 		public
 		onlyRole(MINTER_ROLE)
-		returns (uint256[] memory)
+		returns (uint256[] memory tokenIds)
 	{
-		uint256[] memory tokenIds = new uint256[](creationDates.length);
-
 		for (uint256 i = 0; i < creationDates.length; i++) {
 			tokenIds[i] = mintNft(minter, creationDates[i]);
 		}
-
-		return tokenIds;
 	}
 
-	function _authorizeUpgrade(address newImplementation)
-		internal
-		override
-		onlyRole(UPGRADER_ROLE)
-	{}
-
-	function _burn(uint256 tokenId)
-		internal
-		override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-	{
+	function _burn(uint256 tokenId) internal override(ERC721Upgradeable) {
 		super._burn(tokenId);
+	}
+
+	function _beforeTokenTransfer(
+		address from,
+		address to,
+		uint256 tokenId
+	) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+		super._beforeTokenTransfer(from, to, tokenId);
+	}
+
+	function _beforeConsecutiveTokenTransfer(
+		address from,
+		address to,
+		uint256 first,
+		uint96 size
+	) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+		super._beforeConsecutiveTokenTransfer(from, to, first, size);
 	}
 
 	function supportsInterface(bytes4 interfaceId)
 		public
 		view
-		override(ERC721Upgradeable, AccessControlUpgradeable)
+		override(
+			ERC721Upgradeable,
+			ERC721EnumerableUpgradeable,
+			AccessControlUpgradeable
+		)
 		returns (bool)
 	{
 		return super.supportsInterface(interfaceId);
 	}
 
-	function safeTransferFrom(
+	function _transfer(
 		address from,
 		address to,
 		uint256 tokenId
-	) public override {
-		super.safeTransferFrom(from, to, tokenId);
-		nodeClaimableDate[tokenId] = TRADED_TIME;
-		accessLevels[tokenId] = 'Access Level 0';
+	) internal override {
+		super._transfer(from, to, tokenId);
+		tokenCreationDate[tokenId] = TRADED_TIME;
 	}
 
-	function safeTransferFrom(
-		address from,
-		address to,
-		uint256 tokenId,
-		bytes memory _data
-	) public override {
-		super.safeTransferFrom(from, to, tokenId, _data);
-		nodeClaimableDate[tokenId] = TRADED_TIME;
-		accessLevels[tokenId] = 'Access Level 0';
-	}
-
-	function transferFrom(
-		address from,
-		address to,
-		uint256 tokenId
-	) public override {
-		super.transferFrom(from, to, tokenId);
-		nodeClaimableDate[tokenId] = TRADED_TIME;
-		accessLevels[tokenId] = 'Access Level 0';
-	}
-
-	function getAccessLevel(uint256 creationDate)
-		private
-		pure
-		returns (string memory)
-	{
+	function getAccessLevel(uint256 creationDate) private pure returns (uint256) {
 		// 5/23/22
 		// Date and time (GMT): Monday, 23 May 2022 00:00:00
 		if (creationDate <= 1653264000) {
-			return 'Access Level 6';
+			return 6;
 			// 5/30/22
 			// Date and time (GMT): Monday, 30 May 2022 00:00:00
 		} else if (creationDate <= 1653868800) {
-			return 'Access Level 5';
+			return 5;
 			// 6/29/22
 			// Date and time (GMT): Wednesday, 29 June 2022 00:00:00
 		} else if (creationDate <= 1656460800) {
-			return 'Access Level 4';
+			return 4;
 			// 7/7/22
 			// Date and time (GMT): Thursday, 7 July 2022 00:00:00
 		} else if (creationDate <= 1657152000) {
-			return 'Access Level 3';
+			return 3;
 			// 7/27/22
 			// Date and time (GMT): Wednesday, 27 July 2022 00:00:00
 		} else if (creationDate <= 1658880000) {
-			return 'Access Level 2';
+			return 2;
 			// 8/18/22
 			// Date and time (GMT): Thursday, 18 August 2022 00:00:00
 		} else if (creationDate <= 1660780800) {
-			return 'Access Level 1';
+			return 1;
 			// After 8/18/22
 		} else {
-			return 'Access Level 0';
+			return 0;
 		}
 	}
 }
