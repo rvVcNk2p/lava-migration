@@ -113,19 +113,21 @@ contract LavaNft is
 	{
 		tokenId = _tokenIdCounter.current();
 		_tokenIdCounter.increment();
-		_safeMint(minter, tokenId);
-
 		tokenCreationDate[tokenId] = creationDate;
+		console.log('==', tokenId);
+		_safeMint(minter, tokenId);
 	}
 
 	function mintBatch(address minter, uint256[] memory creationDates)
 		public
 		onlyRole(MINTER_ROLE)
-		returns (uint256[] memory tokenIds)
+		returns (uint256[] memory)
 	{
+		uint256[] memory tokenIds = new uint256[](creationDates.length);
 		for (uint256 i = 0; i < creationDates.length; i++) {
 			tokenIds[i] = mintNft(minter, creationDates[i]);
 		}
+		return tokenIds;
 	}
 
 	function _burn(uint256 tokenId) internal override(ERC721Upgradeable) {

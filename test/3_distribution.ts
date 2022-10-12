@@ -209,7 +209,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		const metadataResult: any = []
 
 		const nftsMetadata = await Promise.all(
-			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+			createdNftIds.map(async (nftId) => await lavaNft.tokenURI(nftId)),
 		)
 		nftsMetadata.forEach((nft: any, idx) => {
 			const parsedTokenUri = JSON.parse(
@@ -305,7 +305,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		const metadataResult: any = []
 
 		const nftsMetadata = await Promise.all(
-			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+			createdNftIds.map(async (nftId) => await lavaNft.tokenURI(nftId)),
 		)
 		nftsMetadata.forEach((nft: any, idx) => {
 			const parsedTokenUri = JSON.parse(
@@ -365,7 +365,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		const metadataResult: any = []
 
 		const nftsMetadata = await Promise.all(
-			createdNftIds.map(async (nftId) => await lavaNft.getTokenURI(nftId)),
+			createdNftIds.map(async (nftId) => await lavaNft.tokenURI(nftId)),
 		)
 		nftsMetadata.forEach((nft: any, idx) => {
 			const parsedTokenUri = JSON.parse(

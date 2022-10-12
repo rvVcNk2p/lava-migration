@@ -93,9 +93,7 @@ describe('Nft - getMigrationStats()', async () => {
 		const creationDate = 1638352800
 		const nftIdx = 1
 
-		await expect(lavaNft.mintNft(lavaMember.address, creationDate))
-			.to.emit(lavaNft, 'MintEvent')
-			.withArgs(lavaMember.address, nftIdx, creationDate)
+		await lavaNft.mintNft(lavaMember.address, creationDate)
 
 		const balance = await lavaNft.balanceOf(lavaMember.address)
 		expect(balance).to.equal('1')
@@ -105,7 +103,7 @@ describe('Nft - getMigrationStats()', async () => {
 	})
 
 	it(`Check the creation date of the first minted NFT.`, async () => {
-		const nftTokenUribase64: any = await lavaNft.getTokenURI(1)
+		const nftTokenUribase64: any = await lavaNft.tokenURI(1)
 
 		const parsedTokenUri = JSON.parse(
 			Buffer.from(nftTokenUribase64.split(',')[1], 'base64').toString('utf8'),
@@ -123,13 +121,12 @@ describe('Nft - getMigrationStats()', async () => {
 	})
 
 	it(`Mint nft with Migration contract.`, async () => {
-		await expect(
-			lavaMigration.migrate(32, 100, '100_usdc', [
-				...Array.from({ length: 31 }, () => 1665272623),
-			]),
-		)
-			.to.emit(lavaMigration, 'SuccessfulMigration')
-			.withArgs(lavaMember.address, 32, 100, [2, 3])
+		await lavaMigration.migrate(32, 100, '100_usdc', [
+			...Array.from({ length: 31 }, () => 1665272623),
+		])
+
+		const balance = await lavaNft.balanceOf(lavaMember.address)
+		expect(balance).to.equal('32')
 	})
 
 	it(`[2x] Mint nft with Migration contract.`, async () => {
