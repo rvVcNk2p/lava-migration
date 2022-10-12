@@ -36,6 +36,7 @@ contract LavaMigration {
 		0x0000000000000000000000000000000000000000;
 	// 	Wed Jan 01 2020 00:00:00 GMT+0000 - Stored in seconds
 	uint256 private constant UNIX_TIMESTAMP = 1577836800;
+	uint256 private constant BATCH_SIZE = 100;
 	address public NFT_CONTRAT_ADDRESS = NULL_WALLET;
 	address public USDCE_TOKEN_ADDRESS = NULL_WALLET;
 	address public OWNER;
@@ -47,6 +48,7 @@ contract LavaMigration {
 		uint256 usdcPayout;
 		string migrationType;
 		bool isSuccess;
+		uint256 remainingMintabeNFt;
 	}
 
 	uint256 migrationIdx = 1;
@@ -159,7 +161,7 @@ contract LavaMigration {
 			claimableNftCount,
 			multiplicateByLavaValue(remainingTrueRoi),
 			nodeTireValues,
-			sliceArray(sort(nodeCreationDates), claimableNftCount)
+			sliceArray(sort(nodeCreationDates), claimableNftCount / 1e18)
 		);
 	}
 
@@ -277,19 +279,58 @@ contract LavaMigration {
 			IERC20(USDCE_TOKEN_ADDRESS).transfer(msg.sender, sentUsdcAmount); // TODO: requestedNftCount
 		}
 
+		uint256[] memory tokenIds;
+
+		migrationIdxMapping[msg.sender] = migrationIdx;
+
+		if (mintedNft > BATCH_SIZE) {
+			tokenIds = ILavaNft(NFT_CONTRAT_ADDRESS).mintBatch(
+				msg.sender,
+				sliceArray(nodeCreationDates, BATCH_SIZE)
+			);
+		} else {
+			tokenIds = ILavaNft(NFT_CONTRAT_ADDRESS).mintBatch(
+				msg.sender,
+				nodeCreationDates
+			);
+		}
+
+		uint256 remainingMintableNftCont = 0;
+		if (mintedNft > BATCH_SIZE)
+			remainingMintableNftCont = mintedNft - BATCH_SIZE;
+
+		Migrations.push(
+			Migration(
+				msg.sender,
+				mintedNft,
+				sentUsdcAmount,
+				migrationType,
+				true,
+				remainingMintableNftCont
+			)
+		);
+		migrationIdx++;
+
+		emit SuccessfulMigration(msg.sender, mintedNft, sentUsdcAmount, tokenIds);
+	}
+
+	function mintRemainingNfts(uint256[] memory nodeCreationDates)
+		public
+		returns (uint256[] memory)
+	{
+		require(
+			getMigrationMember().remainingMintabeNFt > 0,
+			'No more NFT available for mint.'
+		);
 		uint256[] memory tokenIds = ILavaNft(NFT_CONTRAT_ADDRESS).mintBatch(
 			msg.sender,
 			nodeCreationDates
 		);
 
-		migrationIdxMapping[msg.sender] = migrationIdx;
+		Migrations[migrationIdxMapping[msg.sender] - 1]
+			.remainingMintabeNFt -= nodeCreationDates.length;
 
-		Migrations.push(
-			Migration(msg.sender, mintedNft, sentUsdcAmount, migrationType, true)
-		);
-		migrationIdx++;
-
-		emit SuccessfulMigration(msg.sender, mintedNft, sentUsdcAmount, tokenIds);
+		return tokenIds;
 	}
 
 	function multiplicateByLavaValue(uint256 _amount)
@@ -312,6 +353,10 @@ contract LavaMigration {
 		if (migrationIdxMapping[msg.sender] > 0)
 			return Migrations[migrationIdxMapping[msg.sender] - 1].isSuccess;
 		else return false;
+	}
+
+	function getMigrationMember() public view returns (Migration memory) {
+		return Migrations[migrationIdxMapping[msg.sender] - 1];
 	}
 
 	function getMigrationStats()
@@ -426,8 +471,8 @@ contract LavaMigration {
 		returns (uint256[] memory)
 	{
 		// The nodeCreationDates length need to match with maximum claimable nft count from nodes
-		uint256[] memory slicedArray = new uint256[](size / 1e18);
-		for (uint256 i = 0; i < size / 1e18; i++) {
+		uint256[] memory slicedArray = new uint256[](size);
+		for (uint256 i = 0; i < size; i++) {
 			slicedArray[i] = _array[i];
 		}
 		return slicedArray;

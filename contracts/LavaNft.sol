@@ -114,7 +114,6 @@ contract LavaNft is
 		tokenId = _tokenIdCounter.current();
 		_tokenIdCounter.increment();
 		tokenCreationDate[tokenId] = creationDate;
-		console.log('==', tokenId);
 		_safeMint(minter, tokenId);
 	}
 

@@ -355,9 +355,34 @@ describe('migrate() - Test out the entire logic.', async () => {
 			lavaMigration
 				.connect(lavaMember_3)
 				.migrate(maxNftCount, 0, '100_nft', mappedNodeCreationDates),
-		)
-			.to.emit(lavaMigration, 'SuccessfulMigration')
-			.withArgs(lavaMember_3.address, maxNftCount, 0, createdNftIds)
+		).to.emit(lavaMigration, 'SuccessfulMigration')
+
+		//==================================================================
+		//==================================================================
+
+		const [, , , , , remainingMintabeNFt] = await lavaMigration
+			.connect(lavaMember_3)
+			.getMigrationMember()
+		const remainingMintabeNFtInt = parseInt(remainingMintabeNFt + '')
+
+		const iterations = Array(Math.ceil(remainingMintabeNFtInt / 100)).fill(null)
+		const promises = iterations.map(async (_, i) => {
+			const isLast = iterations.length - 1 === i
+			const from = (i + 1) * 100
+			const to = isLast ? mappedNodeCreationDates.length : (i + 1) * 100 + 100
+
+			return await lavaMigration
+				.connect(lavaMember_3)
+				.mintRemainingNfts(mappedNodeCreationDates.slice(from, to))
+		})
+		await Promise.all(promises)
+
+		const [, , , , , _remainingMintabeNFt] = await lavaMigration
+			.connect(lavaMember_3)
+			.getMigrationMember()
+		expect(parseInt(_remainingMintabeNFt + '')).to.be.equal(0)
+		//==================================================================
+		//==================================================================
 
 		// ==================================
 		// [Start] Check the Metadata of NFTs
