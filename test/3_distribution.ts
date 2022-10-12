@@ -413,14 +413,9 @@ describe('migrate() - Test out the entire logic.', async () => {
 		expect(USDEalance).to.be.eq(10000 * 1e6)
 	})
 
-	it('[OK] Get non booster share price [32.0]', async () => {
-		const sharePrice = await lavaDistribution.getNonBoosterSharePrice()
-		const priceInNumber = ethers.utils.formatEther(sharePrice)
-
-		expect(priceInNumber).to.equal('32.0')
-	})
-
 	it('[OK] Get distribution payout by customers.', async () => {
+		await lavaDistribution.setNonBoosterSharePrice()
+
 		const lavaMember1Payout = await lavaDistribution.getConsumerClaimablePayout(
 			lavaMember_1.address,
 		)
@@ -443,8 +438,42 @@ describe('migrate() - Test out the entire logic.', async () => {
 	})
 
 	it('Perform distribution.', async () => {
-		const result = await lavaDistribution.performDistribution()
+		await lavaDistribution.setNonBoosterSharePrice()
 
-		expect(result).to.eq(3)
+		const starterUsdceOnMember1 = await USDCE.balanceOf(lavaMember_1.address)
+		const starterUsdceOnMember2 = await USDCE.balanceOf(lavaMember_2.address)
+		const starterUsdceOnMember3 = await USDCE.balanceOf(lavaMember_3.address)
+
+		const calimablePayout1 = await lavaDistribution.getConsumerClaimablePayout(
+			ethers.utils.getAddress(lavaMember_1.address),
+		)
+
+		const calimablePayout2 = await lavaDistribution.getConsumerClaimablePayout(
+			lavaMember_2.address,
+		)
+		const calimablePayout3 = await lavaDistribution.getConsumerClaimablePayout(
+			lavaMember_3.address,
+		)
+
+		await lavaDistribution.performDistribution()
+
+		const finalUsdceOnMember1 = await USDCE.balanceOf(lavaMember_1.address)
+		const finalUsdceOnMember2 = await USDCE.balanceOf(lavaMember_2.address)
+		const finalUsdceOnMember3 = await USDCE.balanceOf(lavaMember_3.address)
+
+		const remainingUsdcOnContract = await USDCE.balanceOf(
+			lavaDistribution.address,
+		)
+
+		expect(calimablePayout1 / 1e12).to.be.equal(
+			finalUsdceOnMember1 - starterUsdceOnMember1,
+		)
+		expect(calimablePayout2 / 1e12).to.be.equal(
+			finalUsdceOnMember2 - starterUsdceOnMember2,
+		)
+		expect(calimablePayout3 / 1e12).to.be.equal(
+			finalUsdceOnMember3 - starterUsdceOnMember3,
+		)
+		expect(remainingUsdcOnContract).to.be.equal(0)
 	})
 })
