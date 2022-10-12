@@ -8,15 +8,12 @@ import './interfaces/ILavaFinance.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 contract LavaDistribution {
-	// uint256 constant usdceAmount = 20000 * 1e18;
-	// uint256 constant totalLvpNft = 4000;
-
 	address private nftContract;
 	address private migrationContract;
 	address private lavaFinanceContract;
 	address private usdceAddress;
 
-	uint256[] boosterPercentage = [15, 10, 5]; // %
+	uint256[] boosterPercentage = [15, 10, 5]; // Percentages
 
 	constructor(
 		address _nftContract,
@@ -104,8 +101,10 @@ contract LavaDistribution {
 		return distributionValue;
 	}
 
-	function performDistribution() public view {
-		// TODO
+	function performDistribution() public view returns (uint256) {
+		address[] memory nftOwners = ILavaMigration(migrationContract)
+			.getMigratedAddresses();
+		return nftOwners.length;
 	}
 
 	function adjustWithPercentage(uint256 _amount, uint256 _value)

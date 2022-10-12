@@ -441,4 +441,10 @@ describe('migrate() - Test out the entire logic.', async () => {
 			),
 		).to.equal('10000.0')
 	})
+
+	it('Perform distribution.', async () => {
+		const result = await lavaDistribution.performDistribution()
+
+		expect(result).to.eq(3)
+	})
 })

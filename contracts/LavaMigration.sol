@@ -389,6 +389,14 @@ contract LavaMigration {
 		return numberOfBoostedLvps;
 	}
 
+	function getMigratedAddresses() public view returns (address[] memory) {
+		address[] memory migratedAddresses = new address[](migrationIdx - 1);
+		for (uint256 i = 0; i < migrationIdx - 1; i++) {
+			migratedAddresses[i] = Migrations[i].customerAddress;
+		}
+		return migratedAddresses;
+	}
+
 	function setContractOwner(address newAddress) public {
 		require(msg.sender == OWNER, 'Permission denied.');
 		OWNER = newAddress;
