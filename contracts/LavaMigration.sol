@@ -42,6 +42,7 @@ contract LavaMigration {
 	uint256 private constant nftPriceInUsdc = 31500000; // 6 decimal
 
 	struct Migration {
+		address customerAddress;
 		uint256 nftCount;
 		uint256 usdcPayout;
 		string migrationType;
@@ -283,7 +284,9 @@ contract LavaMigration {
 
 		migrationIdxMapping[msg.sender] = migrationIdx;
 
-		Migrations.push(Migration(mintedNft, sentUsdcAmount, migrationType, true));
+		Migrations.push(
+			Migration(msg.sender, mintedNft, sentUsdcAmount, migrationType, true)
+		);
 		migrationIdx++;
 
 		emit SuccessfulMigration(msg.sender, mintedNft, sentUsdcAmount, tokenIds);
@@ -343,6 +346,47 @@ contract LavaMigration {
 		}
 
 		return (migrationIdx - 1, distributionArray, mintedNfts, mintedUsdc);
+	}
+
+	function getBiggestBoostersNft(address _customer)
+		public
+		view
+		returns (uint256)
+	{
+		address goldNFTAddress = ILavaFinance(LAVA_FINANCE).goldNFT();
+		uint256 goldNFTCount = IERC20(goldNFTAddress).balanceOf(_customer);
+		if (goldNFTCount > 0) return 3;
+
+		address silverNFTAddress = ILavaFinance(LAVA_FINANCE).silverNFT();
+		uint256 silverNFTCount = IERC20(silverNFTAddress).balanceOf(_customer);
+		if (silverNFTCount > 0) return 2;
+
+		address bronzeNFTAddress = ILavaFinance(LAVA_FINANCE).bronzeNFT();
+		uint256 bronzeNFTCount = IERC20(bronzeNFTAddress).balanceOf(_customer);
+		if (bronzeNFTCount > 0) return 1;
+
+		return 0;
+	}
+
+	function getNumberOfBoostedLvps() public view returns (uint256[] memory) {
+		// [BRONZ, SILVER, GOLD]
+		uint256[] memory numberOfBoostedLvps = new uint256[](3);
+
+		for (uint256 i = 0; i < migrationIdx - 1; i++) {
+			uint256 biggestBosster = getBiggestBoostersNft(
+				Migrations[i].customerAddress
+			);
+			if (biggestBosster > 0) {
+				uint256 nftCount = ILavaNft(NFT_CONTRAT_ADDRESS).balanceOf(
+					Migrations[i].customerAddress
+				);
+				if (nftCount >= 40) {
+					numberOfBoostedLvps[biggestBosster - 1] += 40;
+				} else numberOfBoostedLvps[biggestBosster - 1] += nftCount;
+			}
+		}
+
+		return numberOfBoostedLvps;
 	}
 
 	function setContractOwner(address newAddress) public {

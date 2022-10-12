@@ -84,11 +84,9 @@ describe('Nft - getMigrationStats()', async () => {
 	it(`NFT contract setup. Everything is has been initialized correctly.`, async () => {
 		const nftName = await lavaNft.name()
 		const nftSymbol = await lavaNft.symbol()
-		const migrationContract = await lavaNft.migrationContract()
 
 		expect(nftName).to.equal(LAVA_NFT_NAME)
 		expect(nftSymbol).to.equal(LAVA_NFT_SYMBOL)
-		expect(lavaMigration.address).to.equal(migrationContract)
 	})
 
 	it(`Mint first NFT from contract.`, async () => {

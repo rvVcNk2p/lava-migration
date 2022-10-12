@@ -26,7 +26,7 @@ contract LavaNft is
 	bytes32 public constant UPGRADER_ROLE = keccak256('UPGRADER_ROLE');
 	CountersUpgradeable.Counter private _tokenIdCounter;
 
-	address public migrationContract;
+	address private migrationContract;
 
 	uint256 private constant TRADED_TIME = 1666396800; // Saturday, 22 October 2022 00:00:00
 
@@ -67,6 +67,10 @@ contract LavaNft is
 		uint256 indexed _tokenId,
 		uint256 creationDate
 	);
+
+	function getMintedNftsCount() public view returns (uint256) {
+		return _tokenIdCounter.current() - 1;
+	}
 
 	function generateDefaultNftImage() public pure returns (string memory) {
 		return string(abi.encodePacked(BASE_IPFS_URL, BASE_IMG_IPFS_CID));
@@ -137,6 +141,7 @@ contract LavaNft is
 		for (uint256 i = 0; i < creationDates.length; i++) {
 			tokenIds[i] = mintNft(minter, creationDates[i]);
 		}
+
 		return tokenIds;
 	}
 

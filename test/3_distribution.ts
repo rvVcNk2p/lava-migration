@@ -2,8 +2,13 @@ import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 import { BigNumber, Contract } from 'ethers'
-import type { LavaMigration, LavaNft } from '../types/ethers/contracts'
 import type {
+	LavaMigration,
+	LavaNft,
+	LavaDistribution,
+} from '../types/ethers/contracts'
+import type {
+	LavaDistribution__factory,
 	LavaMigration__factory,
 	LavaNft__factory,
 } from '../types/ethers/factories/contracts'
@@ -27,6 +32,8 @@ const deployMigrationFixture = async () => {
 	let LavaMigration: LavaMigration__factory
 	let lavaMigration: LavaMigration
 	let lavaNft: LavaNft
+	let LavaDistribution: LavaDistribution__factory
+	let lavaDistribution: LavaDistribution
 
 	const [deployer] = await ethers.getSigners()
 
@@ -64,9 +71,23 @@ const deployMigrationFixture = async () => {
 		lavaMigration.address,
 	])
 
+	LavaDistribution = (await ethers.getContractFactory(
+		'LavaDistribution',
+		deployer,
+	)) as LavaDistribution__factory
+
+	lavaDistribution = await LavaDistribution.deploy(
+		lavaNft.address,
+		lavaMigration.address,
+		LavaContracts.LavaFinance.address,
+		DependencyContracts.erc20.USDCE,
+	)
+	await lavaDistribution.deployed()
+
 	return {
 		lavaMigration,
 		lavaNft,
+		lavaDistribution,
 		deployer,
 		lavaMember_1,
 		lavaMember_2,
@@ -77,6 +98,7 @@ const deployMigrationFixture = async () => {
 describe('migrate() - Test out the entire logic.', async () => {
 	let lavaMigration: LavaMigration
 	let lavaNft: LavaNft
+	let lavaDistribution: LavaDistribution
 	let USDCE: Contract
 
 	let deployer: SignerWithAddress
@@ -88,6 +110,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 		const {
 			lavaMigration: _lavaMigration,
 			lavaNft: _lavaNft,
+			lavaDistribution: _lavaDistribution,
 			deployer: _deployer,
 			lavaMember_1: _lavaMember_1,
 			lavaMember_2: _lavaMember_2,
@@ -96,6 +119,7 @@ describe('migrate() - Test out the entire logic.', async () => {
 
 		lavaMigration = _lavaMigration
 		lavaNft = _lavaNft
+		lavaDistribution = _lavaDistribution
 
 		deployer = _deployer
 		lavaMember_1 = _lavaMember_1
@@ -115,9 +139,10 @@ describe('migrate() - Test out the entire logic.', async () => {
 		)
 
 		await USDCE.transfer(lavaMigration.address, 100000 * 1e6)
+		await USDCE.transfer(lavaDistribution.address, 10000 * 1e6)
 	})
 
-	it(`[OK] Fund Migration contract with: 100.000 USDC.e`, async () => {
+	it(`[OK] Migration contract funded with: 100.000 USDC.e`, async () => {
 		const USDCE = new ethers.Contract(
 			DependencyContracts.erc20.USDCE,
 			DependencyContracts.erc20.ABI,
@@ -233,7 +258,6 @@ describe('migrate() - Test out the entire logic.', async () => {
 			...Array.from({ length: extraNftFromTrueROI }, () => UNIX_TIMESTAMP), // Add extra NFTS
 			...nodeCreationDates,
 		]
-
 		const remainingUsdcAmount = ParseFloat4E(
 			ethers.utils.formatEther(_maxUsdcPayout) -
 				extraNftFromTrueROI * NFT_PRICE_IN_USDC,
@@ -377,5 +401,44 @@ describe('migrate() - Test out the entire logic.', async () => {
 		// ==================================
 		// [START] Check the migration stats
 		// ==================================
+	})
+
+	it(`[OK] Distribution contract funded with: 10.000 USDC.e`, async () => {
+		const USDCE = new ethers.Contract(
+			DependencyContracts.erc20.USDCE,
+			DependencyContracts.erc20.ABI,
+			deployer,
+		)
+		const USDEalance = await USDCE.balanceOf(lavaDistribution.address)
+		expect(USDEalance).to.be.eq(10000 * 1e6)
+	})
+
+	it('[OK] Get non booster share price [32.0]', async () => {
+		const sharePrice = await lavaDistribution.getNonBoosterSharePrice()
+		const priceInNumber = ethers.utils.formatEther(sharePrice)
+
+		expect(priceInNumber).to.equal('32.0')
+	})
+
+	it('[OK] Get distribution payout by customers.', async () => {
+		const lavaMember1Payout = await lavaDistribution.getConsumerClaimablePayout(
+			lavaMember_1.address,
+		)
+		const lavaMember2Payout = await lavaDistribution.getConsumerClaimablePayout(
+			lavaMember_2.address,
+		)
+		const lavaMember3Payout = await lavaDistribution.getConsumerClaimablePayout(
+			lavaMember_3.address,
+		)
+
+		console.log('== lavaMember1: ', ethers.utils.formatEther(lavaMember1Payout))
+		console.log('== lavaMember2: ', ethers.utils.formatEther(lavaMember2Payout))
+		console.log('== lavaMember3: ', ethers.utils.formatEther(lavaMember3Payout))
+
+		expect(
+			ethers.utils.formatEther(
+				lavaMember1Payout.add(lavaMember2Payout).add(lavaMember3Payout),
+			),
+		).to.equal('10000.0')
 	})
 })
