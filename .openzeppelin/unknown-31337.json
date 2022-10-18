@@ -2,7 +2,7 @@
   "manifestVersion": "3.2",
   "admin": {
     "address": "0xea121a60C1455Cd76B4459bf7e69ccdDAB88B325",
-    "txHash": "0xcab086fa2d73e6e9ced967464dc3184cdea2ebf8f839a3795443541433845c8d"
+    "txHash": "0x349b209771fae98bfd1d520b96dd64eddbc69978b314550e8a81ad6c2d406fa2"
   },
   "proxies": [
     {
@@ -32,29 +32,29 @@
     },
     {
       "address": "0x95D805c3858d8048114dbDa9cfffd23d41f9483b",
-      "txHash": "0x620629d73fa96cc139becfb065b37bafe831781fb2714ecf4c9adaeb7d7cfd52",
+      "txHash": "0xdf137e6941f521f07d4324f115d33fd7e021ffc46c4aaaf3d035b018ff00dedc",
       "kind": "transparent"
     },
     {
       "address": "0x269D9d9fa7a332Ac51e445Ef2b38b2Ee96aD2c5B",
-      "txHash": "0x65d908df6668e52534029456d6dd2d1bea9096ffae65cf510f3b37b54ee59d06",
+      "txHash": "0xaddf030511f697041496c6716779e39514bf9995c9cf41c45ef2bf68cedf93ea",
       "kind": "transparent"
     },
     {
       "address": "0x1aa665C346740609DCaF471a00A4Ee31C576ddD1",
-      "txHash": "0x2efba13ae4446ec191468cf7e09b091217ebdef4bd08382c0c4004224f21f2a8",
+      "txHash": "0x1c7e80ae4bf7ea7bc055c5ed7c405f83d35d29465f0b01453c225e0c22774461",
       "kind": "transparent"
     },
     {
       "address": "0x41C9c852B18966eb00574272fDD1e245a73Df58e",
-      "txHash": "0x220e5f0a94a43bb10ea7587258896a9dbe9bc00d0b9544a159949a02fea5622e",
+      "txHash": "0x3b07089072756f3c102704b71f75f7ee080551fb2fc467abd05eaddaeb2b133e",
       "kind": "transparent"
     }
   ],
   "impls": {
-    "d036ddd7ab59322b63b4a666e5e4e7ded1d0c7ec6a7c394262d978383e464ba3": {
+    "531a46848aa05dbb0631f8489309eb52719f19af55c43fedeebf579149aa8e01": {
       "address": "0x7f08948E4dDcd7EE0B9b89006205Ad227032Dfe3",
-      "txHash": "0xf32ad73ac5a64e85e2c878df5125bd660e191aba3736ac75e39c7505bbfaabe2",
+      "txHash": "0xf11ad682e7e072160c1fb0a838ea32d508689d7ec496226acf328ba2e8cc0612",
       "layout": {
         "solcVersion": "0.8.2",
         "storage": [
@@ -218,12 +218,24 @@
             "type": "t_mapping(t_uint256,t_uint256)",
             "contract": "LavaNft",
             "src": "contracts/LavaNft.sol:33"
+          },
+          {
+            "label": "nftHolders",
+            "offset": 0,
+            "slot": "253",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "LavaNft",
+            "src": "contracts/LavaNft.sol:34"
           }
         ],
         "types": {
           "t_address": {
             "label": "address",
             "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
           },
           "t_array(t_uint256)44_storage": {
             "label": "uint256[44]",

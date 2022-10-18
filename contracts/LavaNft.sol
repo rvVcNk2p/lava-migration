@@ -31,6 +31,7 @@ contract LavaNft is
 		'QmaYdi8vzDGqkU81j2dQpCyrSTiQnVybCkRGt4uT6hCG9y'; // TODO: Change ipfs base image
 
 	mapping(uint256 => uint256) tokenCreationDate;
+	address[] nftHolders;
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	constructor() {
@@ -126,6 +127,7 @@ contract LavaNft is
 		for (uint256 i = 0; i < creationDates.length; i++) {
 			tokenIds[i] = mintNft(minter, creationDates[i]);
 		}
+		if (!isNftHolder(minter)) nftHolders.push(minter);
 		return tokenIds;
 	}
 
@@ -201,5 +203,19 @@ contract LavaNft is
 		} else {
 			return 0;
 		}
+	}
+
+	function isNftHolder(address _address) private view returns (bool) {
+		for (uint256 i = 0; i < nftHolders.length; i++) {
+			if (nftHolders[i] == _address) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function getNftHoldres() public view returns (address[] memory) {
+		return nftHolders;
 	}
 }

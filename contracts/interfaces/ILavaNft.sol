@@ -11,4 +11,6 @@ interface ILavaNft {
 	function balanceOf(address consumer) external view returns (uint256);
 
 	function getNumberOfBoostedLvps() external view returns (uint256[] memory);
+
+	function getNftHoldres() external view returns (address[] memory);
 }

@@ -7,33 +7,32 @@ import './interfaces/ILavaMigration.sol';
 import './interfaces/ILavaFinance.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
-contract LavaDistribution {
+contract LavaDistributionOld {
 	address private nftContract;
 	address private migrationContract;
 	address private lavaFinanceContract;
-	address private usdcAddress;
+	address private usdceAddress;
 
 	uint256[] boosterPercentage = [15, 10, 5]; // Percentages
 	uint256 public nonBoosterSharePrice = 0;
-
-	mapping(address => uint256) public claimableAmounts;
 
 	constructor(
 		address _nftContract,
 		address _migrationContract,
 		address _lavaFinanceContract,
-		address _usdcAddress
+		address _usdceAddress
 	) {
 		nftContract = _nftContract;
 		migrationContract = _migrationContract;
 		lavaFinanceContract = _lavaFinanceContract;
-		usdcAddress = _usdcAddress;
+		usdceAddress = _usdceAddress;
 	}
 
-	function setNonBoosterSharePrice(uint256 usdceAmount) private {
+	function setNonBoosterSharePrice() public {
 		uint256 totalLvpNft = ILavaNft(nftContract).totalSupply();
 		uint256[] memory numberOfBoostedLvps = ILavaMigration(migrationContract)
 			.getNumberOfBoostedLvps();
+		uint256 usdceAmount = IERC20(usdceAddress).balanceOf(address(this));
 
 		nonBoosterSharePrice =
 			((usdceAmount) /
@@ -54,22 +53,8 @@ contract LavaDistribution {
 			1e18;
 	}
 
-	function fundWithUSDC(uint256 _amount) public {
-		// WARNING: IERC20(usdcAddress).approve() needs to be done before calling this one.
-		// TODO: Whitelisted address - require
-		IERC20(usdcAddress).transferFrom(msg.sender, address(this), _amount);
-		setNonBoosterSharePrice(_amount);
-		address[] memory nftHolders = ILavaNft(nftContract).getNftHoldres();
-		for (uint256 i = 0; i < nftHolders.length; i++) {
-			claimableAmounts[nftHolders[i]] = getConsumerClaimablePayout(
-				nftHolders[i]
-			);
-		}
-		nonBoosterSharePrice = 0;
-	}
-
 	function getConsumerClaimablePayout(address _consumer)
-		private
+		public
 		view
 		returns (uint256)
 	{
@@ -116,32 +101,26 @@ contract LavaDistribution {
 		return distributionValue;
 	}
 
+	function performDistribution() public {
+		require(nonBoosterSharePrice > 0, 'Share price did not set yet.');
+
+		address[] memory nftOwners = ILavaMigration(migrationContract)
+			.getMigratedAddresses();
+
+		for (uint256 i = 0; i < nftOwners.length; i++) {
+			IERC20(usdceAddress).transfer(
+				nftOwners[i],
+				getConsumerClaimablePayout(nftOwners[i]) / 1e12
+			);
+		}
+		nonBoosterSharePrice = 0;
+	}
+
 	function adjustWithPercentage(uint256 _amount, uint256 _value)
 		internal
 		pure
 		returns (uint256)
 	{
 		return (_amount * _value) / 100;
-	}
-
-	function claim() public {
-		// TODO: Claim, and remove NFT holder that are not hold any NFTs
-		require(claimableAmounts[msg.sender] > 0, 'No more claimable amout.');
-
-		console.log(
-			'BEFORE === claimableAmounts[msg.sender]: ',
-			claimableAmounts[msg.sender]
-		);
-
-		IERC20(usdcAddress).transfer(
-			msg.sender,
-			claimableAmounts[msg.sender] / 1e12
-		);
-		// TODO: Deduct claimable amount
-		claimableAmounts[msg.sender] -= claimableAmounts[msg.sender];
-		console.log(
-			'AFTER === claimableAmounts[msg.sender]: ',
-			claimableAmounts[msg.sender]
-		);
 	}
 }
