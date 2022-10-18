@@ -61,7 +61,7 @@ contract LavaDistribution {
 		setNonBoosterSharePrice(_amount);
 		address[] memory nftHolders = ILavaNft(nftContract).getNftHoldres();
 		for (uint256 i = 0; i < nftHolders.length; i++) {
-			claimableAmounts[nftHolders[i]] = getConsumerClaimablePayout(
+			claimableAmounts[nftHolders[i]] += getConsumerClaimablePayout(
 				nftHolders[i]
 			);
 		}
@@ -128,20 +128,11 @@ contract LavaDistribution {
 		// TODO: Claim, and remove NFT holder that are not hold any NFTs
 		require(claimableAmounts[msg.sender] > 0, 'No more claimable amout.');
 
-		console.log(
-			'BEFORE === claimableAmounts[msg.sender]: ',
-			claimableAmounts[msg.sender]
-		);
-
 		IERC20(usdcAddress).transfer(
 			msg.sender,
 			claimableAmounts[msg.sender] / 1e12
 		);
-		// TODO: Deduct claimable amount
+
 		claimableAmounts[msg.sender] -= claimableAmounts[msg.sender];
-		console.log(
-			'AFTER === claimableAmounts[msg.sender]: ',
-			claimableAmounts[msg.sender]
-		);
 	}
 }
