@@ -416,14 +416,13 @@ contract LavaMigration {
 	function getNumberOfBoostedLvps() public view returns (uint256[] memory) {
 		// [BRONZ, SILVER, GOLD]
 		uint256[] memory numberOfBoostedLvps = new uint256[](3);
+		address[] memory nftHolders = ILavaNft(NFT_CONTRAT_ADDRESS).getNftHoldres();
 
-		for (uint256 i = 0; i < migrationIdx - 1; i++) {
-			uint256 biggestBosster = getBiggestBoostersNft(
-				Migrations[i].customerAddress
-			);
+		for (uint256 i = 0; i < nftHolders.length; i++) {
+			uint256 biggestBosster = getBiggestBoostersNft(nftHolders[i]);
 			if (biggestBosster > 0) {
 				uint256 nftCount = ILavaNft(NFT_CONTRAT_ADDRESS).balanceOf(
-					Migrations[i].customerAddress
+					nftHolders[i]
 				);
 				if (nftCount >= 40) {
 					numberOfBoostedLvps[biggestBosster - 1] += 40;

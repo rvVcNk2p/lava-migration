@@ -35,23 +35,16 @@ contract LavaDistribution {
 		uint256[] memory numberOfBoostedLvps = ILavaMigration(migrationContract)
 			.getNumberOfBoostedLvps();
 
+		uint256 adjustWithPercentages = adjustWithPercentage(
+			numberOfBoostedLvps[0] * 1e6,
+			boosterPercentage[2]
+		) +
+			adjustWithPercentage(numberOfBoostedLvps[1] * 1e6, boosterPercentage[1]) +
+			adjustWithPercentage(numberOfBoostedLvps[2] * 1e6, boosterPercentage[0]);
+
 		nonBoosterSharePrice =
-			((usdceAmount) /
-				(adjustWithPercentage(
-					numberOfBoostedLvps[0] * 1e6,
-					boosterPercentage[0]
-				) +
-					adjustWithPercentage(
-						numberOfBoostedLvps[1] * 1e6,
-						boosterPercentage[1]
-					) +
-					adjustWithPercentage(
-						numberOfBoostedLvps[2] * 1e6,
-						boosterPercentage[2]
-					) +
-					totalLvpNft *
-					1e6)) *
-			1e18;
+			((usdceAmount * 1e12) / (adjustWithPercentages + totalLvpNft * 1e6)) *
+			1e6;
 	}
 
 	function fundWithUSDC(uint256 _amount) public {
@@ -125,7 +118,6 @@ contract LavaDistribution {
 	}
 
 	function claim() public {
-		// TODO: Claim, and remove NFT holder that are not hold any NFTs
 		require(claimableAmounts[msg.sender] > 0, 'No more claimable amout.');
 
 		IERC20(usdcAddress).transfer(

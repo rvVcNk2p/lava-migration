@@ -172,6 +172,10 @@ contract LavaNft is
 	) internal override {
 		super._transfer(from, to, tokenId);
 		tokenCreationDate[tokenId] = TRADED_TIME;
+
+		if (!isNftHolder(to)) nftHolders.push(to);
+		uint256 remainingNfts = this.balanceOf(from);
+		if (remainingNfts == 0) removeNftHolder(from);
 	}
 
 	function getAccessLevel(uint256 creationDate) private pure returns (uint256) {
@@ -217,5 +221,24 @@ contract LavaNft is
 
 	function getNftHoldres() public view returns (address[] memory) {
 		return nftHolders;
+	}
+
+	function removeNftHolder(address _address) private {
+		uint256 indexOfAddress = 0;
+		bool found = false;
+		for (uint256 i = 0; i < nftHolders.length; i++) {
+			if (nftHolders[i] == _address) {
+				indexOfAddress = i;
+				found = true;
+				break;
+			}
+		}
+
+		if (found) {
+			for (uint256 j = indexOfAddress; j < nftHolders.length - 1; j++) {
+				nftHolders[j] = nftHolders[j + 1];
+			}
+			nftHolders.pop();
+		}
 	}
 }
